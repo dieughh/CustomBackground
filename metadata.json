@@ -5,7 +5,7 @@
     "libraryLogo": "logo.png",
     "author": "dieugh",
     "description": "Скрипт, который позволяет менять глобальный фон приложения и фон блока «Моя волна» на любое изображение или видео.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "css": "style.css",
     "script": "script.js",
     "type": "script",
@@ -20,7 +20,8 @@
         "5.90.0"
     ],
     "fromPext": true,
-    "installSource": "local",
+    "installSource": "store",
     "id": "09ad7be0-ca29-48a4-b0a3-14e7990d05c9",
-    "packageHash": "3f89c7fb5a29b4d784bd7a5855958a95e5b39e305daa751a79672dd16c4d15e3"
+    "packageHash": "34da6fca0c67218a7adddefe820690a495e3820b5c7be7347814be5bc1ba5cd3",
+    "storeAddonId": "09ad7be0-ca29-48a4-b0a3-14e7990d05c9"
 }
