@@ -5,7 +5,7 @@
     "libraryLogo": "logo.png",
     "author": "dieugh",
     "description": "Скрипт, который позволяет менять глобальный фон приложения и фон блока «Моя волна» на любое изображение или видео.",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "css": "style.css",
     "script": "script.js",
     "type": "script",
