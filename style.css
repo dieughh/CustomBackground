@@ -1,0 +1,194 @@
+:root, .ym-dark-theme, .ym-light-theme, body, html {
+    --ym-background-color-primary-enabled-basic: transparent !important;
+    --ym-background-color-primary-enabled-content: transparent !important;
+    --ym-background-color-secondary-enabled-basic: transparent !important;
+    --average-color-background: transparent !important;
+    background: transparent !important;
+}
+
+#global-background-layer {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: -1 !important;
+    pointer-events: none;
+    background: black;
+}
+
+#gb-video, #gb-image {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    background-size: cover !important;
+    background-position: center !important;
+    filter: brightness(0.4);
+    transition: opacity 0.5s ease;
+}
+
+#global-bg-picker {
+    position: absolute !important;
+    top: 25px !important;
+    right: 53% !important; 
+    width: 22px !important;
+    height: 22px !important;
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 2px solid rgba(255, 255, 255, 0.7) !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    z-index: 1000000 !important;
+    box-sizing: border-box !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s !important;
+}
+
+#global-bg-picker:hover {
+    transform: scale(1.2) !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+}
+
+.DefaultLayout_root__7J0wo {
+    background: transparent !important;
+}
+
+::-webkit-scrollbar { 
+    width: 0px !important; 
+    background: transparent !important; 
+}
+* { 
+    scrollbar-width: none !important; 
+    -ms-overflow-style: none !important; 
+}
+
+#vibe-media-container {
+    position: absolute !important;
+    inset: 0 -20px -80px -20px !important;
+    z-index: 0 !important;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+#vibe-video, #vibe-image-layer {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    background-size: cover !important;
+    background-position: center !important;
+}
+
+#vibe-media-picker {
+    position: absolute !important;
+    top: 25px !important;
+    right: 47% !important; 
+    width: 22px !important;
+    height: 22px !important;
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 2px solid rgba(255, 255, 255, 0.7) !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    z-index: 1000000 !important;
+    box-sizing: border-box !important;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s !important;
+}
+
+#vibe-media-picker:hover {
+    transform: scale(1.2) !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+}
+
+[class*="MainPage_vibe"] { background: transparent !important; }
+[class*="Vibe_content"] { z-index: 2 !important; }
+
+/* Скрываем старые кружки */
+#global-bg-picker, #vibe-media-picker {
+    display: none !important;
+}
+
+#bg-menu-root {
+    display: flex !important;
+    align-items: center !important;
+    height: 100% !important;
+    margin-right: 15px !important; /* Увеличили отступ, чтобы было куда расширяться */
+    -webkit-app-region: no-drag !important;
+    perspective: 1000px; /* Для более плавного 3D эффекта трансформации */
+}
+
+/* БАЗОВЫЕ СТИЛИ КНОПКИ */
+#bg-menu-button {
+    padding: 4px 14px !important; /* Чуть увеличили паддинги */
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 6px !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    user-select: none !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    
+    /* ЭФФЕКТ ПЕРЕХОДА (Плавность) */
+    transition: 
+        background 0.3s ease,
+        border-color 0.3s ease,
+        transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), /* Плавное расширение */
+        box-shadow 0.4s ease !important;
+    
+    backface-visibility: hidden; /* Убирает мерцание на некоторых видеокартах */
+    -webkit-app-region: no-drag !important;
+    user-select: none !important;
+}
+
+/* ЭФФЕКТ КРАСИВОГО РАСШИРЕНИЯ ПРИ НАВЕДЕНИИ */
+#bg-menu-button:hover {
+    background: rgba(255, 255, 255, 0.18) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    color: #fff !important;
+    
+    /* Само расширение (на 10% больше) */
+    transform: scale(1.1) translateZ(0) !important; 
+    
+    /* Добавляем легкое свечение для объема */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 10px rgba(255, 255, 255, 0.1) !important;
+}
+
+/* СТИЛИ ФИКСИРОВАННОГО МЕНЮ (Без изменений) */
+#bg-menu-dropdown {
+    position: fixed !important;
+    width: 180px !important;
+    background: #1a1a1a !important;
+    border: 1px solid #333 !important;
+    border-radius: 8px !important;
+    display: none !important;
+    flex-direction: column !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.9) !important;
+    z-index: 2147483647 !important;
+    pointer-events: auto !important;
+    
+    /* Появление меню тоже сделаем плавным */
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease !important;
+}
+
+#bg-menu-dropdown.active {
+    display: flex !important;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.bg-menu-item {
+    padding: 12px 15px !important;
+    color: #ddd !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: background 0.2s !important;
+    pointer-events: auto !important;
+}
+
+.bg-menu-item:hover {
+    background: #333 !important;
+    color: #fff !important;
+}
+
+.bg-menu-item:not(:last-child) {
+    border-bottom: 1px solid #222 !important;
+}
