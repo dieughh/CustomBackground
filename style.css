@@ -96,7 +96,6 @@
 [class*="MainPage_vibe"] { background: transparent !important; }
 [class*="Vibe_content"] { z-index: 2 !important; }
 
-/* Скрываем старые кружки */
 #global-bg-picker, #vibe-media-picker {
     display: none !important;
 }
@@ -105,14 +104,13 @@
     display: flex !important;
     align-items: center !important;
     height: 100% !important;
-    margin-right: 15px !important; /* Увеличили отступ, чтобы было куда расширяться */
+    margin-right: 15px !important; 
     -webkit-app-region: no-drag !important;
-    perspective: 1000px; /* Для более плавного 3D эффекта трансформации */
+    perspective: 1000px;
 }
 
-/* БАЗОВЫЕ СТИЛИ КНОПКИ */
 #bg-menu-button {
-    padding: 4px 14px !important; /* Чуть увеличили паддинги */
+    padding: 4px 14px !important; 
     background: rgba(255, 255, 255, 0.08) !important;
     border: 1px solid rgba(255, 255, 255, 0.15) !important;
     border-radius: 6px !important;
@@ -125,32 +123,27 @@
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
     
-    /* ЭФФЕКТ ПЕРЕХОДА (Плавность) */
     transition: 
         background 0.3s ease,
         border-color 0.3s ease,
-        transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), /* Плавное расширение */
+        transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), 
         box-shadow 0.4s ease !important;
     
-    backface-visibility: hidden; /* Убирает мерцание на некоторых видеокартах */
+    backface-visibility: hidden; 
     -webkit-app-region: no-drag !important;
     user-select: none !important;
 }
 
-/* ЭФФЕКТ КРАСИВОГО РАСШИРЕНИЯ ПРИ НАВЕДЕНИИ */
 #bg-menu-button:hover {
     background: rgba(255, 255, 255, 0.18) !important;
     border-color: rgba(255, 255, 255, 0.3) !important;
     color: #fff !important;
     
-    /* Само расширение (на 10% больше) */
     transform: scale(1.1) translateZ(0) !important; 
     
-    /* Добавляем легкое свечение для объема */
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 10px rgba(255, 255, 255, 0.1) !important;
 }
 
-/* СТИЛИ ФИКСИРОВАННОГО МЕНЮ (Без изменений) */
 #bg-menu-dropdown {
     position: fixed !important;
     width: 180px !important;
@@ -163,7 +156,6 @@
     z-index: 2147483647 !important;
     pointer-events: auto !important;
     
-    /* Появление меню тоже сделаем плавным */
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.3s ease, transform 0.3s ease !important;
@@ -191,4 +183,51 @@
 
 .bg-menu-item:not(:last-child) {
     border-bottom: 1px solid #222 !important;
+}
+
+.bg-menu-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+}
+
+.bg-menu-row:not(:last-child) {
+    border-bottom: 1px solid #222 !important;
+}
+
+.bg-menu-item {
+    border-bottom: none !important;
+    flex-grow: 1 !important;
+}
+
+.bg-menu-reset {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 28px !important;
+    height: 28px !important;
+    margin-right: 10px !important;
+    cursor: pointer !important;
+    color: rgba(255, 255, 255, 0.4) !important;
+    border-radius: 6px !important;
+    transition: background 0.2s, color 0.2s !important;
+}
+
+.bg-menu-reset:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+}
+
+.bg-menu-reset svg {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    transform-origin: center center !important;
+}
+
+.bg-menu-reset:hover svg {
+    transform: rotate(180deg) !important;
+}
+
+.bg-menu-reset:active svg {
+    transform: rotate(360deg) scale(0.8) !important;
+    transition: transform 0.2s ease !important;
 }

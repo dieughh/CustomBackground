@@ -70,6 +70,21 @@
         }
     };
 
+    const deleteFile = async (dbName) => {
+        try {
+            const db = await openDB(dbName);
+            if (!db.objectStoreNames.contains('media')) return;
+            const tx = db.transaction('media', 'readwrite');
+            const store = tx.objectStore('media');
+            
+            store.delete('current_bg');
+            
+            tx.oncomplete = () => location.reload();
+        } catch (e) {
+            console.error('Error deleting background:', e);
+        }
+    };
+
     async function applyGlobalStyle() {
         const file = await loadFile('GlobalBackgroundDB');
         if (!file) return;
@@ -139,9 +154,18 @@
         if (!dropdown) {
             dropdown = document.createElement('div');
             dropdown.id = 'bg-menu-dropdown';
+            
+            const resetSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23,12A11,11,0,1,1,12,1a10.9,10.9,0,0,1,5.882,1.7l1.411-1.411A1,1,0,0,1,21,2V6a1,1,0,0,1-1,1H16a1,1,0,0,1-.707-1.707L16.42,4.166A8.9,8.9,0,0,0,12,3a9,9,0,1,0,9,9,1,1,0,0,1,2,0Z"/></svg>`;
+
             dropdown.innerHTML = `
-                <div class="bg-menu-item" id="btn-set-global">Глобальный фон</div>
-                <div class="bg-menu-item" id="btn-set-vibe">Фон Волны</div>
+                <div class="bg-menu-row">
+                    <div class="bg-menu-item" id="btn-set-global">Глобальный фон</div>
+                    <div class="bg-menu-reset" id="btn-reset-global" title="Сбросить фон">${resetSvg}</div>
+                </div>
+                <div class="bg-menu-row">
+                    <div class="bg-menu-item" id="btn-set-vibe">Фон Волны</div>
+                    <div class="bg-menu-reset" id="btn-reset-vibe" title="Сбросить фон">${resetSvg}</div>
+                </div>
             `;
             document.body.appendChild(dropdown);
         }
@@ -160,6 +184,11 @@
             dropdown.classList.toggle('active');
         };
 
+        btn.ondblclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
         const openPicker = (db) => {
             const input = document.createElement('input');
             input.type = 'file';
@@ -171,6 +200,9 @@
 
         document.getElementById('btn-set-global').onclick = () => openPicker('GlobalBackgroundDB');
         document.getElementById('btn-set-vibe').onclick = () => openPicker('VibeVideoDB');
+
+        document.getElementById('btn-reset-global').onclick = () => deleteFile('GlobalBackgroundDB');
+        document.getElementById('btn-reset-vibe').onclick = () => deleteFile('VibeVideoDB');
 
         document.addEventListener('mousedown', (e) => {
             if (!dropdown.contains(e.target) && e.target !== btn) {
