@@ -4,6 +4,8 @@
         vibe: null
     };
 
+    const SETTINGS_KEY = 'glass_enabled';
+
     const openDB = (dbName) => {
         return new Promise((resolve, reject) => {
             const req = indexedDB.open(dbName);
@@ -53,93 +55,100 @@
         };
     };
 
-  async function applyGlobalStyle(forceUpdate = false) {
-    let container = document.getElementById('global-background-layer');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'global-background-layer';
-        document.body.prepend(container);
+    // ===== GLASS =====
+
+    function setGlassEnabled(enabled) {
+        localStorage.setItem(SETTINGS_KEY, enabled ? '1' : '0');
+        document.documentElement.classList.toggle('glass-disabled', !enabled);
+        updateGlassButton();
     }
 
-    if (forceUpdate) delete container.dataset.loaded;
-    if (container.dataset.loaded) return;
+    function isGlassEnabled() {
+        return localStorage.getItem(SETTINGS_KEY) !== '0';
+    }
 
-    const file = await loadFile('GlobalBackgroundDB');
-    
-    if (!file && container.innerHTML !== '') {
-        container.classList.add('removing'); 
-        setTimeout(() => {
+    function updateGlassButton() {
+        const btn = document.getElementById('btn-toggle-glass');
+        if (!btn) return;
+        btn.classList.toggle('active', isGlassEnabled());
+    }
+
+    function initGlassState() {
+        if (!isGlassEnabled()) {
+            document.documentElement.classList.add('glass-disabled');
+        }
+    }
+
+    // ===== BACKGROUND =====
+
+    async function applyGlobalStyle(forceUpdate = false) {
+        let container = document.getElementById('global-background-layer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'global-background-layer';
+            document.body.prepend(container);
+        }
+
+        if (forceUpdate) delete container.dataset.loaded;
+        if (container.dataset.loaded) return;
+
+        const file = await loadFile('GlobalBackgroundDB');
+
+        if (!file) {
             container.innerHTML = '';
-            container.classList.remove('removing');
-            if (objectUrls.global) URL.revokeObjectURL(objectUrls.global);
-        }, 600); 
+            container.dataset.loaded = "true";
+            return;
+        }
+
+        const url = URL.createObjectURL(file);
+        if (objectUrls.global) URL.revokeObjectURL(objectUrls.global);
+        objectUrls.global = url;
+
+        container.innerHTML = file.type.startsWith('video/')
+            ? `<video id="gb-video" src="${url}" autoplay loop muted playsinline></video>`
+            : `<div id="gb-image" style="background-image:url('${url}')"></div>`;
+
         container.dataset.loaded = "true";
-        return;
     }
 
-    if (!file) {
-        container.innerHTML = '';
-        container.dataset.loaded = "true";
-        return;
-    }
+    async function initVibeMedia(forceUpdate = false) {
+        const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
+        if (!vibe) return;
 
-    const url = URL.createObjectURL(file);
-    if (objectUrls.global) URL.revokeObjectURL(objectUrls.global);
-    objectUrls.global = url;
+        // ВЕРНУЛ РАЗМЕР
+        vibe.style.setProperty('height', 'calc(100vh - 70px)', 'important');
+        vibe.style.setProperty('padding', '0', 'important');
 
-    container.innerHTML = file.type.startsWith('video/')
-        ? `<video id="gb-video" src="${url}" autoplay loop muted playsinline style="opacity:0; transition: opacity 0.5s ease-out;" oncanplay="this.style.opacity=1"></video>`
-        : `<div id="gb-image" style="background-image: url('${url}')"></div>`;
-    
-    container.dataset.loaded = "true";
-}
+        let container = document.getElementById('vibe-media-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'vibe-media-container';
+            vibe.prepend(container);
+        }
 
-async function initVibeMedia(forceUpdate = false) {
-    const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
-    if (!vibe) return;
+        if (forceUpdate) delete container.dataset.loaded;
+        if (container.dataset.loaded) return;
 
-    vibe.style.setProperty('height', 'calc(100vh - 70px)', 'important');
-    vibe.style.setProperty('padding', '0', 'important');
+        const file = await loadFile('VibeVideoDB');
 
-    let container = document.getElementById('vibe-media-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'vibe-media-container';
-        vibe.prepend(container);
-    }
-
-    if (forceUpdate) delete container.dataset.loaded;
-    if (container.dataset.loaded) return;
-
-    const file = await loadFile('VibeVideoDB');
-
-    if (!file && container.innerHTML !== '') {
-        container.classList.add('removing');
-        setTimeout(() => {
+        if (!file) {
             container.innerHTML = '';
-            container.classList.remove('removing');
-            if (objectUrls.vibe) URL.revokeObjectURL(objectUrls.vibe);
-        }, 600);
+            container.dataset.loaded = "true";
+            return;
+        }
+
+        const url = URL.createObjectURL(file);
+        if (objectUrls.vibe) URL.revokeObjectURL(objectUrls.vibe);
+        objectUrls.vibe = url;
+
+        container.innerHTML = file.type.startsWith('video/')
+            ? `<video id="vibe-video" src="${url}" autoplay loop muted playsinline></video>`
+            : `<div id="vibe-image-layer" style="background-image:url('${url}')"></div>`;
+
         container.dataset.loaded = "true";
-        return;
     }
 
-    if (!file) {
-        container.innerHTML = '';
-        container.dataset.loaded = "true";
-        return;
-    }
-
-    const url = URL.createObjectURL(file);
-    if (objectUrls.vibe) URL.revokeObjectURL(objectUrls.vibe);
-    objectUrls.vibe = url;
-
- container.innerHTML = file.type.startsWith('video/')
-        ? `<video id="vibe-video" src="${url}" autoplay loop muted playsinline style="opacity:0; transition: opacity 0.5s ease-out;" oncanplay="this.style.opacity=1"></video>`
-        : `<div id="vibe-image-layer" style="background-image: url('${url}')"></div>`;
-
-    container.dataset.loaded = "true";
-}
+    // ===== MENU =====
 
     function injectMenu() {
         const anchorBtn = document.querySelector('.TitleBar_button__9MptL');
@@ -150,39 +159,74 @@ async function initVibeMedia(forceUpdate = false) {
         menuRoot.innerHTML = `<div id="bg-menu-button">Смена фонов</div>`;
         anchorBtn.parentNode.insertBefore(menuRoot, anchorBtn);
 
-        let dropdown = document.getElementById('bg-menu-dropdown');
-        if (!dropdown) {
-            dropdown = document.createElement('div');
-            dropdown.id = 'bg-menu-dropdown';
-            const resetSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23,12A11,11,0,1,1,12,1a10.9,10.9,0,0,1,5.882,1.7l1.411-1.411A1,1,0,0,1,21,2V6a1,1,0,0,1-1,1H16a1,1,0,0,1-.707-1.707L16.42,4.166A8.9,8.9,0,0,0,12,3a9,9,0,1,0,9,9,1,1,0,0,1,2,0Z"/></svg>`;
-            dropdown.innerHTML = `
-                <div class="bg-menu-row">
-                    <div class="bg-menu-item" id="btn-set-global">Глобальный фон</div>
-                    <div class="bg-menu-reset" id="btn-reset-global" title="Сбросить фон">${resetSvg}</div>
-                </div>
-                <div class="bg-menu-row">
-                    <div class="bg-menu-item" id="btn-set-vibe">Фон Волны</div>
-                    <div class="bg-menu-reset" id="btn-reset-vibe" title="Сбросить фон">${resetSvg}</div>
-                </div>
-            `;
-            document.body.appendChild(dropdown);
-        }
+        const dropdown = document.createElement('div');
+        dropdown.id = 'bg-menu-dropdown';
+
+        const resetSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M23,12A11,11,0,1,1,12,1a10.9,10.9,0,0,1,5.882,1.7l1.411-1.411A1,1,0,0,1,21,2V6a1,1,0,0,1-1,1H16a1,1,0,0,1-.707-1.707L16.42,4.166A8.9,8.9,0,0,0,12,3a9,9,0,1,0,9,9,1,1,0,0,1,2,0Z"/></svg>`;
+
+        dropdown.innerHTML = `
+            <div class="bg-menu-row">
+                <div class="bg-menu-item" id="btn-set-global">Глобальный фон</div>
+                <div class="bg-menu-reset" id="btn-reset-global">${resetSvg}</div>
+            </div>
+
+            <div class="bg-menu-row">
+                <div class="bg-menu-item" id="btn-set-vibe">Фон Волны</div>
+                <div class="bg-menu-reset" id="btn-reset-vibe">${resetSvg}</div>
+            </div>
+
+            <div class="bg-menu-item" id="btn-toggle-glass">Жидкое стекло</div>
+        `;
+
+        document.body.appendChild(dropdown);
 
         const btn = document.getElementById('bg-menu-button');
-        btn.onmousedown = (e) => {
-            e.preventDefault(); e.stopPropagation();
-            const rect = btn.getBoundingClientRect();
-            dropdown.style.top = `${rect.bottom + 5}px`;
-            dropdown.style.left = `${rect.left - 130}px`;
-            dropdown.classList.toggle('active');
-        };
 
-        btn.ondblclick = (e) => { e.preventDefault(); e.stopPropagation(); };
+// Используем именно onmousedown — это ключ к решению
+btn.onmousedown = (e) => {
+    // Эти две строки предотвращают сворачивание окна
+    e.preventDefault(); 
+    e.stopPropagation();
+
+    const dropdown = document.getElementById('bg-menu-dropdown');
+    const rect = btn.getBoundingClientRect();
+    
+    // Рассчитываем позицию (в старой версии было смещение left - 130)
+    dropdown.style.top = `${rect.bottom + 5}px`;
+    dropdown.style.left = `${rect.left - 130}px`; 
+    
+    dropdown.classList.toggle('active');
+};
+
+// Чтобы двойной клик тоже не сворачивал окно (на всякий случай)
+btn.ondblclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+};
+// Закрытие меню при клике в любое место за его пределами
+document.addEventListener('mousedown', (e) => {
+    const dropdown = document.getElementById('bg-menu-dropdown');
+    const btn = document.getElementById('bg-menu-button');
+
+    // Если меню открыто И клик был НЕ по кнопке И клик был НЕ по самому меню
+    if (dropdown && dropdown.classList.contains('active')) {
+        if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
+            dropdown.classList.remove('active');
+        }
+    }
+}, { capture: true }); // capture помогает перехватить клик раньше системных скриптов
 
         document.getElementById('btn-set-global').onclick = () => openPicker('GlobalBackgroundDB');
         document.getElementById('btn-set-vibe').onclick = () => openPicker('VibeVideoDB');
+
         document.getElementById('btn-reset-global').onclick = () => deleteFile('GlobalBackgroundDB');
         document.getElementById('btn-reset-vibe').onclick = () => deleteFile('VibeVideoDB');
+
+        document.getElementById('btn-toggle-glass').onclick = () => {
+            setGlassEnabled(!isGlassEnabled());
+        };
+
+        updateGlassButton();
 
         const openPicker = (db) => {
             const input = document.createElement('input');
@@ -191,11 +235,9 @@ async function initVibeMedia(forceUpdate = false) {
             input.onchange = e => saveFile(db, e.target.files[0]);
             input.click();
         };
-
-        document.addEventListener('mousedown', (e) => {
-            if (!dropdown.contains(e.target) && e.target !== btn) dropdown.classList.remove('active');
-        });
     }
+
+    initGlassState();
 
     setInterval(() => {
         applyGlobalStyle();

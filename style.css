@@ -105,8 +105,10 @@
     align-items: center !important;
     height: 100% !important;
     margin-right: 15px !important; 
+    /* Гарантируем, что клики проходят сквозь область перетаскивания */
     -webkit-app-region: no-drag !important;
     perspective: 1000px;
+    pointer-events: auto !important;
 }
 
 #bg-menu-button {
@@ -351,3 +353,104 @@
     to { opacity: 0; }
 }
 
+/* --- МИНИМАЛИСТИЧНЫЙ БЕЛЫЙ ИНДИКАТОР --- */
+#btn-toggle-glass.active {
+    /* Очень тонкий белый фон, едва заметный */
+    background: rgba(255, 255, 255, 0.12) !important; 
+    
+    /* Чистый белый текст */
+    color: #ffffff !important;
+    
+    /* Тонкая полупрозрачная рамка, чтобы отделить кнопку от фона */
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    
+    /* Убираем лишнюю жирность, оставляем среднюю для читаемости */
+    font-weight: 500 !important;
+    
+    /* Мягкое свечение, чтобы кнопка казалась "активной" */
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.05) !important;
+    
+    transition: all 0.2s ease-in-out !important;
+}
+
+/* Эффект при наведении на активную кнопку */
+#btn-toggle-glass.active:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* ПОЛНОЕ ОТКЛЮЧЕНИЕ СТЕКЛА (включая тент, тени и фон плеера) */
+.glass-disabled [class*="PlayButton_root"],
+.glass-disabled [class*="VibeContext_pinButton"],
+.glass-disabled [class*="VibeContext_context"],
+.glass-disabled [class*="MainPage_vibe"]::before {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: transparent !important; 
+    box-shadow: none !important;
+    border-color: transparent !important;
+}
+
+/* Отключаем градиентный блик поверх кнопок */
+.glass-disabled [class*="PlayButton_root"]::after, 
+.glass-disabled [class*="VibeContext_pinButton"]::after {
+    display: none !important;
+}
+
+/* Отключаем блюр и фон у кнопки "Настроить Мою волну" */
+.glass-disabled .iJVAJMgccD4vj4E4o068,
+.glass-disabled .nHWc2sto1C6Gm0Dpw_l0,
+.glass-disabled [class*="VibeSettings_toggleSettingsButton"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255, 255, 255, 0.1) !important; /* Делаем легкую подложку вместо блюра */
+    box-shadow: none !important;
+}
+
+/* Если нужно, чтобы кнопка стала совсем прозрачной без стекла */
+.glass-disabled [class*="VibeSettings_toggleSettingsButton"] {
+    background: transparent !important;
+}
+
+/* --- ФИНАЛЬНЫЙ ФИКС ЖИДКОГО СТЕКЛА --- */
+
+/* 1. Возвращаем СТАНДАРТНЫЙ вид всем кнопкам на сайте (вкладки, фильтры и т.д.) */
+.glass-disabled .iJVAJMgccD4vj4E4o068, 
+.glass-disabled .nHWc2sto1C6Gm0Dpw_l0,
+.glass-disabled [role="tab"] {
+    background-color: var(--ym-controls-color-secondary-default-enabled) !important;
+    backdrop-filter: saturate(180%) blur(0.9375rem) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* 2. Делаем ПОЛНУЮ прозрачность ТОЛЬКО внутри контейнера "Моей Волны" */
+.glass-disabled [class*="MainPage_vibe"] .iJVAJMgccD4vj4E4o068, 
+.glass-disabled [class*="MainPage_vibe"] .nHWc2sto1C6Gm0Dpw_l0,
+.glass-disabled [class*="MainPage_vibe"] [class*="PlayButton_root"], 
+.glass-disabled [class*="MainPage_vibe"] [class*="VibeContext_pinButton"],
+.glass-disabled [class*="MainPage_vibe"] [class*="VibeContext_context"],
+.glass-disabled [class*="MainPage_vibe"] [class*="VibeSettings_toggleSettingsButton"],
+.glass-disabled [class*="MainPage_vibe"]::before {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* 3. Убираем блики (::after) только в Волне */
+.glass-disabled [class*="MainPage_vibe"] *::after {
+    display: none !important;
+}
+
+/* 4. Индикатор активной кнопки в твоем меню */
+#btn-toggle-glass.active {
+    background: rgba(255, 255, 255, 0.12) !important; 
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    font-weight: 500 !important;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.05) !important;
+}
