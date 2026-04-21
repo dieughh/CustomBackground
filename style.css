@@ -1,3 +1,18 @@
+/* ============================================
+   CUSTOM BACKGROUND — Полный stylesheet
+   ============================================ */
+
+/* --- CSS-переменные (управляются из настроек PulseSync) --- */
+:root {
+    --global-blur: 0px;
+    --global-brightness: 0.4;
+    --vibe-blur: 0px;
+    --vibe-brightness: 0.4;
+    --vignette-opacity: 0;
+    --vibe-vignette-opacity: 0;
+}
+
+/* --- Прозрачность фона Яндекс Музыки --- */
 :root, .ym-dark-theme, .ym-light-theme, body, html {
     --ym-background-color-primary-enabled-basic: transparent !important;
     --ym-background-color-primary-enabled-content: transparent !important;
@@ -6,48 +21,127 @@
     background: transparent !important;
 }
 
-#global-background-layer {
+.DefaultLayout_root__7J0wo {
+    background: transparent !important;
+}
+
+/* --- Скрываем старые слои --- */
+#global-background-layer,
+#vibe-media-container,
+#global-bg-picker,
+#vibe-media-picker {
+    display: none !important;
+}
+
+/* ============================================
+   НОВЫЕ КОНТЕЙНЕРЫ С CROSSFADE
+   ============================================ */
+
+/* Глобальный фон */
+#global-background-container {
     position: fixed !important;
     inset: 0 !important;
     z-index: -1 !important;
     pointer-events: none;
     background: black;
+    overflow: hidden;
 }
 
-#gb-video, #gb-image {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    background-size: cover !important;
-    background-position: center !important;
-    filter: brightness(0.4);
-    transition: opacity 0.5s ease;
+#global-background-container .bg-layer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    z-index: 0;
 }
 
-#global-bg-picker {
+#global-background-container .bg-layer.active {
+    opacity: 1;
+}
+
+#global-background-container .bg-image,
+#global-background-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-size: cover;
+    background-position: center;
+    filter: brightness(var(--global-brightness, 0.4)) blur(var(--global-blur, 0px));
+    animation: fadeInBg 0.6s ease-out forwards;
+}
+
+/* Виньетка глобального фона */
+#global-background-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        circle at center,
+        transparent 30%,
+        rgba(0, 0, 0, 0.95) 100%
+    );
+    opacity: var(--vignette-opacity, 0);
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    z-index: 1;
+}
+
+/* Фон «Моей волны» */
+#vibe-background-container {
     position: absolute !important;
-    top: 25px !important;
-    right: 53% !important; 
-    width: 22px !important;
-    height: 22px !important;
-    background: rgba(255, 255, 255, 0.4) !important;
-    border: 2px solid rgba(255, 255, 255, 0.7) !important;
-    border-radius: 50% !important;
-    cursor: pointer !important;
-    z-index: 1000000 !important;
-    box-sizing: border-box !important;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s !important;
+    inset: 0 -20px -80px -20px !important;
+    z-index: 0 !important;
+    overflow: hidden;
+    pointer-events: none;
 }
 
-#global-bg-picker:hover {
-    transform: scale(1.2) !important;
-    background: rgba(255, 255, 255, 0.8) !important;
+#vibe-background-container .bg-layer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    z-index: 0;
 }
 
-.DefaultLayout_root__7J0wo {
-    background: transparent !important;
+#vibe-background-container .bg-layer.active {
+    opacity: 1;
 }
 
+#vibe-background-container .bg-image,
+#vibe-background-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-size: cover;
+    background-position: center;
+    filter: brightness(var(--vibe-brightness, 0.4)) blur(var(--vibe-blur, 0px));
+    animation: fadeInBg 0.6s ease-out forwards;
+}
+
+/* Виньетка фона Волны */
+#vibe-background-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        circle at center,
+        transparent 30%,
+        rgba(0, 0, 0, 0.95) 100%
+    );
+    opacity: var(--vibe-vignette-opacity, 0);
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+    z-index: 1;
+}
+
+@keyframes fadeInBg {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ============================================
+   СКРОЛЛБАР
+   ============================================ */
 ::-webkit-scrollbar { 
     width: 0px !important; 
     background: transparent !important; 
@@ -57,55 +151,14 @@
     -ms-overflow-style: none !important; 
 }
 
-#vibe-media-container {
-    position: absolute !important;
-    inset: 0 -20px -80px -20px !important;
-    z-index: 0 !important;
-    overflow: hidden;
-    pointer-events: none;
-}
-
-#vibe-video, #vibe-image-layer {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    background-size: cover !important;
-    background-position: center !important;
-}
-
-#vibe-media-picker {
-    position: absolute !important;
-    top: 25px !important;
-    right: 47% !important; 
-    width: 22px !important;
-    height: 22px !important;
-    background: rgba(255, 255, 255, 0.4) !important;
-    border: 2px solid rgba(255, 255, 255, 0.7) !important;
-    border-radius: 50% !important;
-    cursor: pointer !important;
-    z-index: 1000000 !important;
-    box-sizing: border-box !important;
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s !important;
-}
-
-#vibe-media-picker:hover {
-    transform: scale(1.2) !important;
-    background: rgba(255, 255, 255, 0.8) !important;
-}
-
-[class*="MainPage_vibe"] { background: transparent !important; }
-[class*="Vibe_content"] { z-index: 2 !important; }
-
-#global-bg-picker, #vibe-media-picker {
-    display: none !important;
-}
-
+/* ============================================
+   МЕНЮ «СМЕНА ФОНОВ»
+   ============================================ */
 #bg-menu-root {
     display: flex !important;
     align-items: center !important;
     height: 100% !important;
     margin-right: 15px !important; 
-    /* Гарантируем, что клики проходят сквозь область перетаскивания */
     -webkit-app-region: no-drag !important;
     perspective: 1000px;
     pointer-events: auto !important;
@@ -124,25 +177,20 @@
     user-select: none !important;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
-    
     transition: 
         background 0.3s ease,
         border-color 0.3s ease,
         transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), 
         box-shadow 0.4s ease !important;
-    
     backface-visibility: hidden; 
     -webkit-app-region: no-drag !important;
-    user-select: none !important;
 }
 
 #bg-menu-button:hover {
     background: rgba(255, 255, 255, 0.18) !important;
     border-color: rgba(255, 255, 255, 0.3) !important;
     color: #fff !important;
-    
     transform: scale(1.1) translateZ(0) !important; 
-    
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 10px rgba(255, 255, 255, 0.1) !important;
 }
 
@@ -157,7 +205,6 @@
     box-shadow: 0 10px 40px rgba(0,0,0,0.9) !important;
     z-index: 2147483647 !important;
     pointer-events: auto !important;
-    
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.3s ease, transform 0.3s ease !important;
@@ -234,31 +281,37 @@
     transition: transform 0.2s ease !important;
 }
 
-#gb-video, #gb-image, #vibe-video, #vibe-image-layer {
-    animation: fadeInBg 0.6s ease-out forwards !important;
+/* ============================================
+   АДАПТИВНЫЕ КНОПКИ (индикаторы)
+   ============================================ */
+#btn-toggle-adaptive-global.active,
+#btn-toggle-adaptive-vibe.active {
+    background: rgba(255, 255, 255, 0.12) !important; 
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    font-weight: 500 !important;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.05) !important;
+    transition: all 0.2s ease-in-out !important;
 }
 
-@keyframes fadeInBg {
-    from { opacity: 0; }
-    to { opacity: 1; }
+#btn-toggle-adaptive-global.active:hover,
+#btn-toggle-adaptive-vibe.active:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
-#global-background-layer:empty, #vibe-media-container:empty {
-    background: transparent !important;
-}
-
+/* ============================================
+   ЖИДКОЕ СТЕКЛО (Glass)
+   ============================================ */
 [class*="PlayButton_root"] {
     background: rgba(0, 0, 0, 0.5) !important; 
     backdrop-filter: blur(20px) saturate(180%) !important; 
-    
     box-shadow: 
         inset 0 1px 1px rgba(255, 255, 255, 0.3),
         inset 0 -1px 1px rgba(0, 0, 0, 0.4),
         0 4px 15px rgba(0, 0, 0, 0.6) !important; 
-    
     border: 1px solid rgba(255, 255, 255, 0.2) !important;
     color: #fff !important;
-    
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
     transition: background 0.2s ease !important;
 }
@@ -323,63 +376,7 @@
     transform: none !important;
 }
 
-#gb-video, #gb-image, #vibe-video, #vibe-image-layer {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    background-size: cover !important;
-    background-position: center !important;
-    animation: fadeInBg 0.3s ease-out forwards !important;
-}
-
-#gb-video, #gb-image {
-    filter: brightness(0.4);
-}
-
-#global-background-layer.removing #gb-video,
-#global-background-layer.removing #gb-image,
-#vibe-media-container.removing #vibe-video,
-#vibe-media-container.removing #vibe-image-layer {
-    animation: fadeOutBg 0.3s ease-in forwards !important;
-}
-
-@keyframes fadeInBg {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-@keyframes fadeOutBg {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
-
-/* --- МИНИМАЛИСТИЧНЫЙ БЕЛЫЙ ИНДИКАТОР --- */
-#btn-toggle-glass.active {
-    /* Очень тонкий белый фон, едва заметный */
-    background: rgba(255, 255, 255, 0.12) !important; 
-    
-    /* Чистый белый текст */
-    color: #ffffff !important;
-    
-    /* Тонкая полупрозрачная рамка, чтобы отделить кнопку от фона */
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    
-    /* Убираем лишнюю жирность, оставляем среднюю для читаемости */
-    font-weight: 500 !important;
-    
-    /* Мягкое свечение, чтобы кнопка казалась "активной" */
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.05) !important;
-    
-    transition: all 0.2s ease-in-out !important;
-}
-
-/* Эффект при наведении на активную кнопку */
-#btn-toggle-glass.active:hover {
-    background: rgba(255, 255, 255, 0.2) !important;
-    border-color: rgba(255, 255, 255, 0.4) !important;
-}
-
-/* ПОЛНОЕ ОТКЛЮЧЕНИЕ СТЕКЛА (включая тент, тени и фон плеера) */
+/* --- ОТКЛЮЧЕНИЕ СТЕКЛА --- */
 .glass-disabled [class*="PlayButton_root"],
 .glass-disabled [class*="VibeContext_pinButton"],
 .glass-disabled [class*="VibeContext_context"],
@@ -391,30 +388,25 @@
     border-color: transparent !important;
 }
 
-/* Отключаем градиентный блик поверх кнопок */
 .glass-disabled [class*="PlayButton_root"]::after, 
 .glass-disabled [class*="VibeContext_pinButton"]::after {
     display: none !important;
 }
 
-/* Отключаем блюр и фон у кнопки "Настроить Мою волну" */
 .glass-disabled .iJVAJMgccD4vj4E4o068,
 .glass-disabled .nHWc2sto1C6Gm0Dpw_l0,
 .glass-disabled [class*="VibeSettings_toggleSettingsButton"] {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
-    background: rgba(255, 255, 255, 0.1) !important; /* Делаем легкую подложку вместо блюра */
+    background: rgba(255, 255, 255, 0.1) !important;
     box-shadow: none !important;
 }
 
-/* Если нужно, чтобы кнопка стала совсем прозрачной без стекла */
 .glass-disabled [class*="VibeSettings_toggleSettingsButton"] {
     background: transparent !important;
 }
 
-/* --- ФИНАЛЬНЫЙ ФИКС ЖИДКОГО СТЕКЛА --- */
-
-/* 1. Возвращаем СТАНДАРТНЫЙ вид всем кнопкам на сайте (вкладки, фильтры и т.д.) */
+/* Возвращаем стандартный вид кнопкам вне Волны */
 .glass-disabled .iJVAJMgccD4vj4E4o068, 
 .glass-disabled .nHWc2sto1C6Gm0Dpw_l0,
 .glass-disabled [role="tab"] {
@@ -424,7 +416,7 @@
     visibility: visible !important;
 }
 
-/* 2. Делаем ПОЛНУЮ прозрачность ТОЛЬКО внутри контейнера "Моей Волны" */
+/* Полная прозрачность только внутри Волны */
 .glass-disabled [class*="MainPage_vibe"] .iJVAJMgccD4vj4E4o068, 
 .glass-disabled [class*="MainPage_vibe"] .nHWc2sto1C6Gm0Dpw_l0,
 .glass-disabled [class*="MainPage_vibe"] [class*="PlayButton_root"], 
@@ -441,16 +433,17 @@
     border: none !important;
 }
 
-/* 3. Убираем блики (::after) только в Волне */
 .glass-disabled [class*="MainPage_vibe"] *::after {
     display: none !important;
 }
 
-/* 4. Индикатор активной кнопки в твоем меню */
-#btn-toggle-glass.active {
-    background: rgba(255, 255, 255, 0.12) !important; 
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    font-weight: 500 !important;
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.05) !important;
+/* ============================================
+   РАЗНОЕ
+   ============================================ */
+[class*="MainPage_vibe"] { 
+    background: transparent !important; 
+}
+
+[class*="Vibe_content"] { 
+    z-index: 2 !important; 
 }

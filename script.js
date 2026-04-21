@@ -1,11 +1,18 @@
 (() => {
-    const objectUrls = {
-        global: null,
-        vibe: null
-    };
+    const ADAPTIVE_GLOBAL_KEY = 'adaptive_global_enabled';
+    const ADAPTIVE_VIBE_KEY = 'adaptive_vibe_enabled';
+    let lastCoverUrl = null;
+    let addonSettings = {};
 
-    const SETTINGS_KEY = 'glass_enabled';
+    let globalFileCache = null;
+    let vibeFileCache  = null;
+    const currentGlobal = { url: null };
+    const currentVibe   = { url: null };
 
+    // Таймеры для плавного сброса
+    const resetTimers = { global: null, vibe: null };
+
+    // ===== IndexedDB =====
     const openDB = (dbName) => {
         return new Promise((resolve, reject) => {
             const req = indexedDB.open(dbName);
@@ -24,10 +31,14 @@
         const tx = db.transaction('media', 'readwrite');
         const store = tx.objectStore('media');
         store.put(file, 'current_bg');
-
         tx.oncomplete = () => {
-            if (dbName === 'GlobalBackgroundDB') applyGlobalStyle(true);
-            else initVibeMedia(true);
+            if (dbName === 'GlobalBackgroundDB') {
+                globalFileCache = null;
+                applyGlobalStyle(true);
+            } else {
+                vibeFileCache = null;
+                initVibeMedia(true);
+            }
         };
     };
 
@@ -45,111 +56,283 @@
     };
 
     const deleteFile = async (dbName) => {
-        const db = await openDB(dbName);
-        const tx = db.transaction('media', 'readwrite');
-        const store = tx.objectStore('media');
-        store.delete('current_bg');
-        tx.oncomplete = () => {
-            if (dbName === 'GlobalBackgroundDB') applyGlobalStyle(true);
-            else initVibeMedia(true);
-        };
+        return new Promise(async (resolve) => {
+            try {
+                const db = await openDB(dbName);
+                const tx = db.transaction('media', 'readwrite');
+                const store = tx.objectStore('media');
+                store.delete('current_bg');
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            } catch { resolve(); }
+        });
     };
 
-    // ===== GLASS =====
-
-    function setGlassEnabled(enabled) {
-        localStorage.setItem(SETTINGS_KEY, enabled ? '1' : '0');
-        document.documentElement.classList.toggle('glass-disabled', !enabled);
-        updateGlassButton();
-    }
-
-    function isGlassEnabled() {
-        return localStorage.getItem(SETTINGS_KEY) !== '0';
-    }
-
-    function updateGlassButton() {
-        const btn = document.getElementById('btn-toggle-glass');
-        if (!btn) return;
-        btn.classList.toggle('active', isGlassEnabled());
-    }
-
-    function initGlassState() {
-        if (!isGlassEnabled()) {
-            document.documentElement.classList.add('glass-disabled');
+    // ===== SETTINGS =====
+    function getSetting(id, defaultValue = false) {
+        const s = addonSettings[id];
+        if (!s) return defaultValue;
+        const v = s.value;
+        if (v === undefined || v === null) return defaultValue;
+        if (typeof defaultValue === 'number') {
+            const num = Number(v);
+            return isNaN(num) ? defaultValue : num;
         }
+        if (typeof v === 'boolean') return v;
+        if (v === 'true' || v === 1 || v === '1') return true;
+        if (v === 'false' || v === 0 || v === '0') return false;
+        return v;
     }
 
-    // ===== BACKGROUND =====
+    function applySettings() {
+        const gBlur = getSetting('globalBlur', 0);
+        const gBright = getSetting('globalBrightness', 0.4);
+        const vBlur = getSetting('vibeBlur', 0);
+        const vBright = getSetting('vibeBrightness', 0.4);
+        const vig = getSetting('vignetteIntensity', 0);
+        const vVig = getSetting('vibeVignetteIntensity', 0);
 
-    async function applyGlobalStyle(forceUpdate = false) {
-        let container = document.getElementById('global-background-layer');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'global-background-layer';
-            document.body.prepend(container);
-        }
+        document.documentElement.style.setProperty('--global-blur', `${gBlur}px`);
+        document.documentElement.style.setProperty('--global-brightness', gBright);
+        document.documentElement.style.setProperty('--vibe-blur', `${vBlur}px`);
+        document.documentElement.style.setProperty('--vibe-brightness', vBright);
+        document.documentElement.style.setProperty('--vignette-opacity', (vig / 100).toFixed(2));
+        document.documentElement.style.setProperty('--vibe-vignette-opacity', (vVig / 100).toFixed(2));
 
-        if (forceUpdate) delete container.dataset.loaded;
-        if (container.dataset.loaded) return;
+        const glass = getSetting('glass_enabled', true);
+        document.documentElement.classList.toggle('glass-disabled', !glass);
+    }
 
-        const file = await loadFile('GlobalBackgroundDB');
+    // ===== ADAPTIVE =====
+    function setAdaptiveGlobalEnabled(enabled) {
+        localStorage.setItem(ADAPTIVE_GLOBAL_KEY, enabled ? '1' : '0');
+        updateAdaptiveButtons();
+    }
 
-        if (!file) {
-            container.innerHTML = '';
-            container.dataset.loaded = "true";
+    function isAdaptiveGlobalEnabled() {
+        return localStorage.getItem(ADAPTIVE_GLOBAL_KEY) === '1';
+    }
+
+    function setAdaptiveVibeEnabled(enabled) {
+        localStorage.setItem(ADAPTIVE_VIBE_KEY, enabled ? '1' : '0');
+        updateAdaptiveButtons();
+    }
+
+    function isAdaptiveVibeEnabled() {
+        return localStorage.getItem(ADAPTIVE_VIBE_KEY) === '1';
+    }
+
+    function updateAdaptiveButtons() {
+        const btnG = document.getElementById('btn-toggle-adaptive-global');
+        const btnV = document.getElementById('btn-toggle-adaptive-vibe');
+        if (btnG) btnG.classList.toggle('active', isAdaptiveGlobalEnabled());
+        if (btnV) btnV.classList.toggle('active', isAdaptiveVibeEnabled());
+    }
+
+    // ===== COVER HELPERS =====
+    const preloadImage = (url) => new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = url;
+    });
+
+    function getHighResCoverUrl(coverUri) {
+        if (!coverUri) return null;
+        let uri = coverUri;
+        if (!uri.startsWith('http')) uri = 'https://' + uri;
+        return uri.replace(/\/\d+x\d+(?=[/?&]|$)/, '/1000x1000');
+    }
+
+    async function updateAdaptiveCover(coverUri) {
+        if (!coverUri) {
+            lastCoverUrl = null;
+            if (isAdaptiveGlobalEnabled()) applyGlobalStyle(true);
+            if (isAdaptiveVibeEnabled()) initVibeMedia(true);
             return;
         }
-
-        const url = URL.createObjectURL(file);
-        if (objectUrls.global) URL.revokeObjectURL(objectUrls.global);
-        objectUrls.global = url;
-
-        container.innerHTML = file.type.startsWith('video/')
-            ? `<video id="gb-video" src="${url}" autoplay loop muted playsinline></video>`
-            : `<div id="gb-image" style="background-image:url('${url}')"></div>`;
-
-        container.dataset.loaded = "true";
+        const url = getHighResCoverUrl(coverUri);
+        if (!url || url === lastCoverUrl) return;
+        const ok = await preloadImage(url);
+        if (!ok) return;
+        lastCoverUrl = url;
+        if (isAdaptiveGlobalEnabled()) applyGlobalStyle(true);
+        if (isAdaptiveVibeEnabled()) initVibeMedia(true);
     }
 
-    async function initVibeMedia(forceUpdate = false) {
-        const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
-        if (!vibe) return;
+    // ===== CROSSFADE LAYERS =====
+    function getGlobalContainer() {
+        let container = document.getElementById('global-background-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'global-background-container';
+            document.body.prepend(container);
 
-        // ВЕРНУЛ РАЗМЕР
+            const l1 = document.createElement('div');
+            l1.className = 'bg-layer active';
+            const l2 = document.createElement('div');
+            l2.className = 'bg-layer';
+            container.appendChild(l1);
+            container.appendChild(l2);
+        }
+        return container;
+    }
+
+    function getVibeContainer() {
+        const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
+        if (!vibe) return null;
         vibe.style.setProperty('height', 'calc(100vh - 70px)', 'important');
         vibe.style.setProperty('padding', '0', 'important');
 
-        let container = document.getElementById('vibe-media-container');
+        let container = document.getElementById('vibe-background-container');
         if (!container) {
             container = document.createElement('div');
-            container.id = 'vibe-media-container';
+            container.id = 'vibe-background-container';
             vibe.prepend(container);
+
+            const l1 = document.createElement('div');
+            l1.className = 'bg-layer active';
+            const l2 = document.createElement('div');
+            l2.className = 'bg-layer';
+            container.appendChild(l1);
+            container.appendChild(l2);
+        }
+        return container;
+    }
+
+    function crossfade(container, url, isVideo) {
+        if (!container || !url) return;
+        const active = container.querySelector('.bg-layer.active');
+        const inactive = container.querySelector('.bg-layer:not(.active)');
+        if (!active || !inactive) return;
+
+        inactive.innerHTML = '';
+        if (isVideo) {
+            const video = document.createElement('video');
+            video.src = url;
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
+            inactive.appendChild(video);
+            if (!document.hidden) video.play().catch(() => {});
+        } else {
+            const div = document.createElement('div');
+            div.className = 'bg-image';
+            div.style.backgroundImage = `url('${url}')`;
+            inactive.appendChild(div);
         }
 
-        if (forceUpdate) delete container.dataset.loaded;
-        if (container.dataset.loaded) return;
+        active.classList.remove('active');
+        inactive.classList.add('active');
 
-        const file = await loadFile('VibeVideoDB');
+        setTimeout(() => {
+            if (!active.classList.contains('active')) active.innerHTML = '';
+        }, 700);
+    }
 
-        if (!file) {
-            container.innerHTML = '';
-            container.dataset.loaded = "true";
+    function fadeOutClear(container, timerKey) {
+        if (!container) return;
+        const active = container.querySelector('.bg-layer.active');
+        if (active) active.classList.remove('active');
+
+        clearTimeout(resetTimers[timerKey]);
+        resetTimers[timerKey] = setTimeout(() => {
+            container.querySelectorAll('.bg-layer').forEach(l => l.innerHTML = '');
+            resetTimers[timerKey] = null;
+        }, 600);
+    }
+
+    // ===== BACKGROUND =====
+    async function applyGlobalStyle(force = false) {
+        const container = getGlobalContainer();
+        let targetUrl = null;
+        let isVideo = false;
+
+        if (isAdaptiveGlobalEnabled()) {
+            targetUrl = lastCoverUrl;
+        } else {
+            const file = await loadFile('GlobalBackgroundDB');
+            if (file) {
+                if (!globalFileCache) {
+                    globalFileCache = { url: URL.createObjectURL(file), type: file.type };
+                }
+                targetUrl = globalFileCache.url;
+                isVideo = globalFileCache.type.startsWith('video/');
+            } else if (globalFileCache) {
+                URL.revokeObjectURL(globalFileCache.url);
+                globalFileCache = null;
+            }
+        }
+
+        // Если пришёл новый фон во время fade-out — отменяем очистку
+        if (targetUrl) {
+            clearTimeout(resetTimers.global);
+            resetTimers.global = null;
+        }
+
+        if (!force && currentGlobal.url === targetUrl) return;
+        currentGlobal.url = targetUrl;
+
+        if (!targetUrl) {
+            fadeOutClear(container, 'global');
             return;
         }
 
-        const url = URL.createObjectURL(file);
-        if (objectUrls.vibe) URL.revokeObjectURL(objectUrls.vibe);
-        objectUrls.vibe = url;
-
-        container.innerHTML = file.type.startsWith('video/')
-            ? `<video id="vibe-video" src="${url}" autoplay loop muted playsinline></video>`
-            : `<div id="vibe-image-layer" style="background-image:url('${url}')"></div>`;
-
-        container.dataset.loaded = "true";
+        crossfade(container, targetUrl, isVideo);
     }
 
-    // ===== MENU =====
+    async function initVibeMedia(force = false) {
+        const container = getVibeContainer();
+        if (!container) return;
 
+        let targetUrl = null;
+        let isVideo = false;
+
+        if (isAdaptiveVibeEnabled()) {
+            targetUrl = lastCoverUrl;
+        } else {
+            const file = await loadFile('VibeVideoDB');
+            if (file) {
+                if (!vibeFileCache) {
+                    vibeFileCache = { url: URL.createObjectURL(file), type: file.type };
+                }
+                targetUrl = vibeFileCache.url;
+                isVideo = vibeFileCache.type.startsWith('video/');
+            } else if (vibeFileCache) {
+                URL.revokeObjectURL(vibeFileCache.url);
+                vibeFileCache = null;
+            }
+        }
+
+        if (targetUrl) {
+            clearTimeout(resetTimers.vibe);
+            resetTimers.vibe = null;
+        }
+
+        if (!force && currentVibe.url === targetUrl) return;
+        currentVibe.url = targetUrl;
+
+        if (!targetUrl) {
+            fadeOutClear(container, 'vibe');
+            return;
+        }
+
+        crossfade(container, targetUrl, isVideo);
+    }
+
+    // ===== VIDEO PAUSE/PLAY =====
+    function updateVideoPlayback() {
+        const hidden = document.hidden;
+        document.querySelectorAll('#global-background-container video, #vibe-background-container video').forEach(v => {
+            if (hidden) v.pause();
+            else v.play().catch(() => {});
+        });
+    }
+    document.addEventListener('visibilitychange', updateVideoPlayback);
+
+    // ===== MENU =====
     function injectMenu() {
         const anchorBtn = document.querySelector('.TitleBar_button__9MptL');
         if (!anchorBtn || document.getElementById('bg-menu-root')) return;
@@ -169,79 +352,192 @@
                 <div class="bg-menu-item" id="btn-set-global">Глобальный фон</div>
                 <div class="bg-menu-reset" id="btn-reset-global">${resetSvg}</div>
             </div>
-
             <div class="bg-menu-row">
                 <div class="bg-menu-item" id="btn-set-vibe">Фон Волны</div>
                 <div class="bg-menu-reset" id="btn-reset-vibe">${resetSvg}</div>
             </div>
-
-            <div class="bg-menu-item" id="btn-toggle-glass">Жидкое стекло</div>
+            <div class="bg-menu-item" id="btn-toggle-adaptive-global">Адаптивный фон</div>
+            <div class="bg-menu-item" id="btn-toggle-adaptive-vibe">Адаптивная волна</div>
         `;
 
         document.body.appendChild(dropdown);
 
         const btn = document.getElementById('bg-menu-button');
 
-// Используем именно onmousedown — это ключ к решению
-btn.onmousedown = (e) => {
-    // Эти две строки предотвращают сворачивание окна
-    e.preventDefault(); 
-    e.stopPropagation();
-
-    const dropdown = document.getElementById('bg-menu-dropdown');
-    const rect = btn.getBoundingClientRect();
-    
-    // Рассчитываем позицию (в старой версии было смещение left - 130)
-    dropdown.style.top = `${rect.bottom + 5}px`;
-    dropdown.style.left = `${rect.left - 130}px`; 
-    
-    dropdown.classList.toggle('active');
-};
-
-// Чтобы двойной клик тоже не сворачивал окно (на всякий случай)
-btn.ondblclick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-};
-// Закрытие меню при клике в любое место за его пределами
-document.addEventListener('mousedown', (e) => {
-    const dropdown = document.getElementById('bg-menu-dropdown');
-    const btn = document.getElementById('bg-menu-button');
-
-    // Если меню открыто И клик был НЕ по кнопке И клик был НЕ по самому меню
-    if (dropdown && dropdown.classList.contains('active')) {
-        if (!dropdown.contains(e.target) && !btn.contains(e.target)) {
-            dropdown.classList.remove('active');
+        function positionDropdown() {
+            const rect = btn.getBoundingClientRect();
+            const dd = document.getElementById('bg-menu-dropdown');
+            if (!dd) return;
+            
+            const ddWidth = 180;
+            const left = rect.left + (rect.width / 2) - (ddWidth / 2);
+            
+            dd.style.top = `${rect.bottom + 8}px`;
+            dd.style.left = `${Math.max(8, left)}px`;
         }
-    }
-}, { capture: true }); // capture помогает перехватить клик раньше системных скриптов
 
-        document.getElementById('btn-set-global').onclick = () => openPicker('GlobalBackgroundDB');
-        document.getElementById('btn-set-vibe').onclick = () => openPicker('VibeVideoDB');
-
-        document.getElementById('btn-reset-global').onclick = () => deleteFile('GlobalBackgroundDB');
-        document.getElementById('btn-reset-vibe').onclick = () => deleteFile('VibeVideoDB');
-
-        document.getElementById('btn-toggle-glass').onclick = () => {
-            setGlassEnabled(!isGlassEnabled());
+        btn.onmousedown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const dd = document.getElementById('bg-menu-dropdown');
+            const wasActive = dd.classList.contains('active');
+            
+            if (!wasActive) {
+                positionDropdown();
+            }
+            
+            dd.classList.toggle('active');
         };
 
-        updateGlassButton();
+        btn.ondblclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        // Пересчёт позиции при ресайзе окна, если меню открыто
+        window.addEventListener('resize', () => {
+            const dd = document.getElementById('bg-menu-dropdown');
+            if (dd && dd.classList.contains('active')) {
+                positionDropdown();
+            }
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            const dd = document.getElementById('bg-menu-dropdown');
+            if (dd && dd.classList.contains('active')) {
+                if (!dd.contains(e.target) && !btn.contains(e.target)) {
+                    dd.classList.remove('active');
+                }
+            }
+        }, { capture: true });
 
         const openPicker = (db) => {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'video/mp4,video/webm,image/*';
-            input.onchange = e => saveFile(db, e.target.files[0]);
+            input.onchange = e => {
+                if (e.target.files[0]) {
+                    if (db === 'GlobalBackgroundDB') setAdaptiveGlobalEnabled(false);
+                    else setAdaptiveVibeEnabled(false);
+                    saveFile(db, e.target.files[0]);
+                }
+            };
             input.click();
         };
+
+        document.getElementById('btn-set-global').onclick = () => openPicker('GlobalBackgroundDB');
+        document.getElementById('btn-set-vibe').onclick = () => openPicker('VibeVideoDB');
+
+        document.getElementById('btn-reset-global').onclick = async () => {
+            await deleteFile('GlobalBackgroundDB');
+            globalFileCache = null;
+            currentGlobal.url = null;
+            applyGlobalStyle(true);
+        };
+        document.getElementById('btn-reset-vibe').onclick = async () => {
+            await deleteFile('VibeVideoDB');
+            vibeFileCache = null;
+            currentVibe.url = null;
+            initVibeMedia(true);
+        };
+
+        document.getElementById('btn-toggle-adaptive-global').onclick = async () => {
+            const next = !isAdaptiveGlobalEnabled();
+            if (next) await deleteFile('GlobalBackgroundDB');
+            setAdaptiveGlobalEnabled(next);
+            applyGlobalStyle(true);
+        };
+
+        document.getElementById('btn-toggle-adaptive-vibe').onclick = async () => {
+            const next = !isAdaptiveVibeEnabled();
+            if (next) await deleteFile('VibeVideoDB');
+            setAdaptiveVibeEnabled(next);
+            initVibeMedia(true);
+        };
+
+        updateAdaptiveButtons();
+    }
+    // ===== PULSE SYNC SETTINGS API =====
+    function initPulseSyncSettings() {
+        if (!window.pulsesyncApi) {
+            setTimeout(initPulseSyncSettings, 500);
+            return;
+        }
+        const addonName = 'Custom Background';
+        let api = null;
+        try {
+            api = window.pulsesyncApi.getSettings?.(addonName);
+        } catch (e) {
+            console.warn('[CustomBackground] getSettings error:', e);
+        }
+        if (!api || !api.onChange) {
+            setTimeout(initPulseSyncSettings, 1000);
+            return;
+        }
+
+        const handle = (s) => {
+            addonSettings = s || {};
+            applySettings();
+        };
+
+        handle(api.getCurrent?.() || {});
+        api.onChange((s) => handle(s));
+        console.log('[CustomBackground] PulseSync settings API подключен');
     }
 
-    initGlassState();
+    // ===== PULSE SYNC TRACK API =====
+    function initPulseSyncTracking() {
+        if (typeof Theme === 'undefined') return false;
+        try {
+            const theme = new Theme('custom-background');
+            const handleEvent = (eventData) => {
+                const track = eventData?.state?.track;
+                updateAdaptiveCover(track?.coverUri);
+            };
+            theme.player.on('trackChange', handleEvent);
+            theme.player.on('pageChange', handleEvent);
+            try {
+                const cur = theme.player.getCurrentTrack?.();
+                if (cur?.coverUri) updateAdaptiveCover(cur.coverUri);
+            } catch (e) {}
+            return true;
+        } catch (e) {
+            console.error('[CustomBackground] PulseSync API error:', e);
+            return false;
+        }
+    }
+
+    // ===== Fallback DOM tracking =====
+    function initPlayerDomTracking() {
+        let prevUrl = null;
+        setInterval(() => {
+            if (!isAdaptiveGlobalEnabled() && !isAdaptiveVibeEnabled()) return;
+            const playerBar = document.querySelector('[class*="PlayerBarDesktop"]') 
+                || document.querySelector('[data-test-id="PLAYER_BAR"]')
+                || document.querySelector('.player-controls__track')
+                || document.querySelector('[class*="player_bar"]');
+            if (!playerBar) return;
+            const img = playerBar.querySelector('img[src*="avatars.yandex.net"]');
+            if (!img || !img.src) return;
+            const highRes = img.src.replace(/&amp;/g, '&').replace(/\/\d+x\d+(?=[/?&]|$)/, '/1000x1000');
+            if (highRes !== prevUrl) {
+                prevUrl = highRes;
+                lastCoverUrl = highRes;
+                if (isAdaptiveGlobalEnabled()) applyGlobalStyle(true);
+                if (isAdaptiveVibeEnabled()) initVibeMedia(true);
+            }
+        }, 1000);
+    }
+
+    // ===== INIT =====
+    applySettings();
+    if (!initPulseSyncTracking()) initPlayerDomTracking();
+    initPulseSyncSettings();
 
     setInterval(() => {
+        injectMenu();
         applyGlobalStyle();
         initVibeMedia();
-        injectMenu();
     }, 500);
 })();
