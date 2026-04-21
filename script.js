@@ -4,13 +4,18 @@
     let lastCoverUrl = null;
     let addonSettings = {};
 
+    // Кэш для blob:URL и управления состоянием
     let globalFileCache = null;
-    let vibeFileCache  = null;
+    let vibeFileCache = null;
     const currentGlobal = { url: null };
-    const currentVibe   = { url: null };
-
-    // Таймеры для плавного сброса
+    const currentVibe = { url: null };
     const resetTimers = { global: null, vibe: null };
+    let globalBlobUrls = new Set();
+    let vibeBlobUrls = new Set();
+
+    // Флаги для предотвращения дублирования
+    let globalUpdatePending = false;
+    let vibeUpdatePending = false;
 
     // ===== IndexedDB =====
     const openDB = (dbName) => {
@@ -33,7 +38,7 @@
         store.put(file, 'current_bg');
         tx.oncomplete = () => {
             if (dbName === 'GlobalBackgroundDB') {
-                globalFileCache = null;
+                globalFileCache = null; // сбросим кэш, чтобы пересоздать URL
                 applyGlobalStyle(true);
             } else {
                 vibeFileCache = null;
@@ -161,52 +166,88 @@
         if (isAdaptiveVibeEnabled()) initVibeMedia(true);
     }
 
-    // ===== CROSSFADE LAYERS =====
-    function getGlobalContainer() {
-        let container = document.getElementById('global-background-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'global-background-container';
-            document.body.prepend(container);
+    function ensureLayers(container) {
+    let layers = container.querySelectorAll('.bg-layer');
+    if (layers.length < 2) {
+        container.innerHTML = '';
+        const l1 = document.createElement('div');
+        l1.className = 'bg-layer active';
+        const l2 = document.createElement('div');
+        l2.className = 'bg-layer';
+        container.appendChild(l1);
+        container.appendChild(l2);
+        layers = [l1, l2];
+    }
+    if (!container.querySelector('.bg-layer.active')) {
+        layers[0].classList.add('active');
+        layers[1].classList.remove('active');
+    }
+    
+    // Добавляем слой виньетки, если его нет
+    if (!container.querySelector('.vignette-layer')) {
+        const vignette = document.createElement('div');
+        vignette.className = 'vignette-layer';
+        container.appendChild(vignette);
+    }
+    
+    return container;
+}
 
-            const l1 = document.createElement('div');
-            l1.className = 'bg-layer active';
-            const l2 = document.createElement('div');
-            l2.className = 'bg-layer';
-            container.appendChild(l1);
-            container.appendChild(l2);
+    function createContainer(id, prependTo) {
+        let container = document.getElementById(id);
+        if (!container && prependTo) {
+            container = document.createElement('div');
+            container.id = id;
+            prependTo.prepend(container);
+            ensureLayers(container);
+        } else if (container) {
+            ensureLayers(container);
         }
         return container;
+    }
+
+    function getGlobalContainer() {
+        return createContainer('global-background-container', document.body);
     }
 
     function getVibeContainer() {
-        const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
-        if (!vibe) return null;
-        vibe.style.setProperty('height', 'calc(100vh - 70px)', 'important');
-        vibe.style.setProperty('padding', '0', 'important');
+    const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
+    const oldContainer = document.getElementById('vibe-background-container');
+    
+    if (!vibe) {
+        if (oldContainer) oldContainer.remove();
+        return null;
+    }
+    
+    vibe.style.setProperty('height', 'calc(100vh - 70px)', 'important');
+    vibe.style.setProperty('padding', '0', 'important');
+    
+    let container = createContainer('vibe-background-container', vibe);
+    
+    // Если контейнер был пересоздан (старый удалён), сбрасываем сохранённый URL
+    if (!oldContainer || oldContainer !== container) {
+        currentVibe.url = null;
+    }
+    
+    return container;
+}
 
-        let container = document.getElementById('vibe-background-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'vibe-background-container';
-            vibe.prepend(container);
-
-            const l1 = document.createElement('div');
-            l1.className = 'bg-layer active';
-            const l2 = document.createElement('div');
-            l2.className = 'bg-layer';
-            container.appendChild(l1);
-            container.appendChild(l2);
+    function cleanupOldBlobUrls(urlSet, newUrl) {
+        for (const url of urlSet) {
+            if (url !== newUrl) URL.revokeObjectURL(url);
         }
-        return container;
+        urlSet.clear();
+        if (newUrl) urlSet.add(newUrl);
     }
 
     function crossfade(container, url, isVideo) {
-        if (!container || !url) return;
+        if (!container || !url) return false;
+        ensureLayers(container);
         const active = container.querySelector('.bg-layer.active');
         const inactive = container.querySelector('.bg-layer:not(.active)');
-        if (!active || !inactive) return;
+        if (!active || !inactive) return false;
 
+        // Очищаем неактивный слой
         inactive.innerHTML = '';
         if (isVideo) {
             const video = document.createElement('video');
@@ -224,16 +265,26 @@
             inactive.appendChild(div);
         }
 
+        // Принудительная перерисовка перед сменой класса (решает проблемы с мгновенным обновлением)
+        inactive.offsetHeight; // чтение свойства вызывает reflow
+
+        // Меняем активный слой
         active.classList.remove('active');
         inactive.classList.add('active');
 
+        // Очищаем старый слой после анимации
         setTimeout(() => {
-            if (!active.classList.contains('active')) active.innerHTML = '';
+            if (!active.classList.contains('active')) {
+                active.innerHTML = '';
+            }
         }, 700);
+
+        return true;
     }
 
     function fadeOutClear(container, timerKey) {
         if (!container) return;
+        ensureLayers(container);
         const active = container.querySelector('.bg-layer.active');
         if (active) active.classList.remove('active');
 
@@ -246,7 +297,18 @@
 
     // ===== BACKGROUND =====
     async function applyGlobalStyle(force = false) {
+    if (globalUpdatePending) return;
+    globalUpdatePending = true;
+
+    try {
         const container = getGlobalContainer();
+        
+        // Если активный слой пуст — принудительно обновим фон
+        const activeLayer = container.querySelector('.bg-layer.active');
+        if (activeLayer && !activeLayer.hasChildNodes()) {
+            force = true;
+        }
+
         let targetUrl = null;
         let isVideo = false;
 
@@ -256,13 +318,17 @@
             const file = await loadFile('GlobalBackgroundDB');
             if (file) {
                 if (!globalFileCache) {
-                    globalFileCache = { url: URL.createObjectURL(file), type: file.type };
+                    const newUrl = URL.createObjectURL(file);
+                    globalFileCache = { url: newUrl, type: file.type };
+                    cleanupOldBlobUrls(globalBlobUrls, newUrl);
                 }
                 targetUrl = globalFileCache.url;
                 isVideo = globalFileCache.type.startsWith('video/');
-            } else if (globalFileCache) {
-                URL.revokeObjectURL(globalFileCache.url);
-                globalFileCache = null;
+            } else {
+                if (globalFileCache) {
+                    cleanupOldBlobUrls(globalBlobUrls, null);
+                    globalFileCache = null;
+                }
             }
         }
 
@@ -272,7 +338,9 @@
             resetTimers.global = null;
         }
 
-        if (!force && currentGlobal.url === targetUrl) return;
+        const shouldUpdate = force || (currentGlobal.url !== targetUrl);
+        if (!shouldUpdate) return;
+
         currentGlobal.url = targetUrl;
 
         if (!targetUrl) {
@@ -281,11 +349,24 @@
         }
 
         crossfade(container, targetUrl, isVideo);
+    } finally {
+        globalUpdatePending = false;
     }
+}
 
     async function initVibeMedia(force = false) {
+    if (vibeUpdatePending) return;
+    vibeUpdatePending = true;
+
+    try {
         const container = getVibeContainer();
         if (!container) return;
+
+        // Если активный слой пуст — принудительно обновим фон
+        const activeLayer = container.querySelector('.bg-layer.active');
+        if (activeLayer && !activeLayer.hasChildNodes()) {
+            force = true;
+        }
 
         let targetUrl = null;
         let isVideo = false;
@@ -296,13 +377,17 @@
             const file = await loadFile('VibeVideoDB');
             if (file) {
                 if (!vibeFileCache) {
-                    vibeFileCache = { url: URL.createObjectURL(file), type: file.type };
+                    const newUrl = URL.createObjectURL(file);
+                    vibeFileCache = { url: newUrl, type: file.type };
+                    cleanupOldBlobUrls(vibeBlobUrls, newUrl);
                 }
                 targetUrl = vibeFileCache.url;
                 isVideo = vibeFileCache.type.startsWith('video/');
-            } else if (vibeFileCache) {
-                URL.revokeObjectURL(vibeFileCache.url);
-                vibeFileCache = null;
+            } else {
+                if (vibeFileCache) {
+                    cleanupOldBlobUrls(vibeBlobUrls, null);
+                    vibeFileCache = null;
+                }
             }
         }
 
@@ -311,7 +396,9 @@
             resetTimers.vibe = null;
         }
 
-        if (!force && currentVibe.url === targetUrl) return;
+        const shouldUpdate = force || (currentVibe.url !== targetUrl);
+        if (!shouldUpdate) return;
+
         currentVibe.url = targetUrl;
 
         if (!targetUrl) {
@@ -320,7 +407,10 @@
         }
 
         crossfade(container, targetUrl, isVideo);
+    } finally {
+        vibeUpdatePending = false;
     }
+}
 
     // ===== VIDEO PAUSE/PLAY =====
     function updateVideoPlayback() {
@@ -395,7 +485,6 @@
             e.stopPropagation();
         };
 
-        // Пересчёт позиции при ресайзе окна, если меню открыто
         window.addEventListener('resize', () => {
             const dd = document.getElementById('bg-menu-dropdown');
             if (dd && dd.classList.contains('active')) {
@@ -458,6 +547,40 @@
 
         updateAdaptiveButtons();
     }
+
+    // ===== OBSERVERS =====
+    let globalContainerObserver = null;
+    let vibeContainerObserver = null;
+    let menuObserver = null;
+
+    function initObservers() {
+        // Observer для глобального контейнера (всегда есть)
+        globalContainerObserver = new MutationObserver(() => {
+            applyGlobalStyle();
+        });
+        globalContainerObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Observer для контейнера "Моей волны"
+        vibeContainerObserver = new MutationObserver(() => {
+            initVibeMedia();
+        });
+        vibeContainerObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Observer для меню
+        menuObserver = new MutationObserver(() => {
+            if (!document.getElementById('bg-menu-root') && document.querySelector('.TitleBar_button__9MptL')) {
+                injectMenu();
+            }
+        });
+        menuObserver.observe(document.body, { childList: true, subtree: true });
+    }
+
+    function disconnectObservers() {
+        if (globalContainerObserver) globalContainerObserver.disconnect();
+        if (vibeContainerObserver) vibeContainerObserver.disconnect();
+        if (menuObserver) menuObserver.disconnect();
+    }
+
     // ===== PULSE SYNC SETTINGS API =====
     function initPulseSyncSettings() {
         if (!window.pulsesyncApi) {
@@ -532,12 +655,15 @@
 
     // ===== INIT =====
     applySettings();
+    initObservers();
+    
     if (!initPulseSyncTracking()) initPlayerDomTracking();
     initPulseSyncSettings();
 
-    setInterval(() => {
-        injectMenu();
-        applyGlobalStyle();
-        initVibeMedia();
-    }, 500);
+    // Очистка при выгрузке аддона
+    window.addEventListener('beforeunload', () => {
+        disconnectObservers();
+        cleanupOldBlobUrls(globalBlobUrls, null);
+        cleanupOldBlobUrls(vibeBlobUrls, null);
+    });
 })();
