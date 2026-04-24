@@ -39,6 +39,28 @@
                     "defaultParameter": 0.4
                 },
                 {
+                    "id": "globalPixelate",
+                    "name": "Пикселизация",
+                    "description": "Эффект мозаики (0–20)",
+                    "type": "slider",
+                    "min": 0,
+                    "max": 20,
+                    "step": 1,
+                    "value": 0,
+                    "defaultParameter": 0
+                },
+                {
+                    "id": "globalOpacity",
+                    "name": "Непрозрачность",
+                    "description": "Уровень прозрачности (0 – полностью прозрачный, 100 – непрозрачный)",
+                    "type": "slider",
+                    "min": 0,
+                    "max": 100,
+                    "step": 1,
+                    "value": 100,
+                    "defaultParameter": 100
+                },
+                {
                     "id": "vignetteIntensity",
                     "name": "Виньетка",
                     "description": "Затемнение по краям экрана. 0 — выключено, 100 — максимальное.",
@@ -75,6 +97,28 @@
                     "step": 0.05,
                     "value": 0.4,
                     "defaultParameter": 0.4
+                },
+                {
+                    "id": "vibePixelate",
+                    "name": "Пикселизация",
+                    "description": "Эффект мозаики (0–20)",
+                    "type": "slider",
+                    "min": 0,
+                    "max": 20,
+                    "step": 1,
+                    "value": 0,
+                    "defaultParameter": 0
+                },
+                {
+                    "id": "vibeOpacity",
+                    "name": "Непрозрачность",
+                    "description": "Уровень прозрачности (0 – полностью прозрачный, 100 – непрозрачный)",
+                    "type": "slider",
+                    "min": 0,
+                    "max": 100,
+                    "step": 1,
+                    "value": 100,
+                    "defaultParameter": 100
                 },
                 {
                     "id": "vibeVignetteIntensity",

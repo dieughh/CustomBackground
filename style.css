@@ -2,12 +2,15 @@
    CUSTOM BACKGROUND — Полный stylesheet
    ============================================ */
 
-/* --- CSS-переменные (управляются из настроек PulseSync) --- */
 :root {
     --global-blur: 0px;
     --global-brightness: 0.4;
+    --global-pixelate: 0;
+    --global-opacity: 1;
     --vibe-blur: 0px;
     --vibe-brightness: 0.4;
+    --vibe-pixelate: 0;
+    --vibe-opacity: 1;
     --vignette-opacity: 0;
     --vibe-vignette-opacity: 0;
 }
@@ -37,7 +40,6 @@
    НОВЫЕ КОНТЕЙНЕРЫ С CROSSFADE
    ============================================ */
 
-/* Глобальный фон */
 #global-background-container {
     position: fixed !important;
     inset: 0 !important;
@@ -45,9 +47,10 @@
     pointer-events: none;
     background: black;
     overflow: hidden;
+    opacity: var(--global-opacity, 1);
 }
 
-#global-background-container .bg-layer {
+#global-background-container .cbg-layer {
     position: absolute;
     inset: 0;
     opacity: 0;
@@ -55,22 +58,19 @@
     z-index: 0;
 }
 
-#global-background-container .bg-layer.active {
+#global-background-container .cbg-layer.active {
     opacity: 1;
 }
 
-#global-background-container .bg-image,
-#global-background-container video {
+#global-background-container .cbg-media {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    background-size: cover;
-    background-position: center;
+    display: block;
     filter: brightness(var(--global-brightness, 0.4)) blur(var(--global-blur, 0px));
     animation: fadeInBg 0.6s ease-out forwards;
 }
 
-/* Виньетка глобального фона */
 #global-background-container::after {
     content: '';
     position: absolute;
@@ -86,16 +86,17 @@
     z-index: 1;
 }
 
-/* Фон «Моей волны» */
 #vibe-background-container {
     position: absolute !important;
     inset: 0 -20px -80px -20px !important;
     z-index: 0 !important;
     overflow: hidden;
     pointer-events: none;
+    opacity: var(--vibe-opacity, 1);
+    min-height: calc(100vh - 70px);
 }
 
-#vibe-background-container .bg-layer {
+#vibe-background-container .cbg-layer {
     position: absolute;
     inset: 0;
     opacity: 0;
@@ -103,23 +104,20 @@
     z-index: 0;
 }
 
-#vibe-background-container .bg-layer.active {
+#vibe-background-container .cbg-layer.active {
     opacity: 1;
 }
 
-#vibe-background-container .bg-image,
-#vibe-background-container video {
+#vibe-background-container .cbg-media {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    background-size: cover;
-    background-position: center;
+    display: block;
     filter: brightness(var(--vibe-brightness, 0.4)) blur(var(--vibe-blur, 0px));
     animation: fadeInBg 0.6s ease-out forwards;
 }
 
-/* Виньетка фона Волны — независимый слой */
-#vibe-background-container .vignette-layer {
+#vibe-background-container .cbg-vignette {
     content: '';
     position: absolute;
     inset: 0;
@@ -140,6 +138,28 @@
 }
 
 /* ============================================
+   ПИКСЕЛИЗАЦИЯ (Canvas)
+   ============================================ */
+#global-pixel-canvas,
+#vibe-pixel-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    image-rendering: pixelated;
+}
+#global-pixel-canvas {
+    filter: brightness(var(--global-brightness, 0.4)) blur(var(--global-blur, 0px));
+    opacity: var(--global-opacity, 1);
+}
+#vibe-pixel-canvas {
+    filter: brightness(var(--vibe-brightness, 0.4)) blur(var(--vibe-blur, 0px));
+    opacity: var(--vibe-opacity, 1);
+}
+
+/* ============================================
    СКРОЛЛБАР
    ============================================ */
 ::-webkit-scrollbar { 
@@ -154,45 +174,6 @@
 /* ============================================
    МЕНЮ «СМЕНА ФОНОВ»
    ============================================ */
-#bg-menu-root {
-    display: flex !important;
-    align-items: center !important;
-    height: 100% !important;
-    margin-right: 15px !important; 
-    -webkit-app-region: no-drag !important;
-    perspective: 1000px;
-    pointer-events: auto !important;
-}
-
-#bg-menu-button {
-    padding: 4px 14px !important; 
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    border-radius: 6px !important;
-    color: rgba(255, 255, 255, 0.9) !important;
-    font-size: 11px !important;
-    font-weight: bold !important;
-    cursor: pointer !important;
-    pointer-events: auto !important;
-    user-select: none !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    transition: 
-        background 0.3s ease,
-        border-color 0.3s ease,
-        transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), 
-        box-shadow 0.4s ease !important;
-    backface-visibility: hidden; 
-    -webkit-app-region: no-drag !important;
-}
-
-#bg-menu-button:hover {
-    background: rgba(255, 255, 255, 0.18) !important;
-    border-color: rgba(255, 255, 255, 0.3) !important;
-    color: #fff !important;
-    transform: scale(1.1) translateZ(0) !important; 
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 10px rgba(255, 255, 255, 0.1) !important;
-}
 
 #bg-menu-dropdown {
     position: fixed !important;
@@ -244,7 +225,7 @@
     border-bottom: 1px solid #222 !important;
 }
 
-.bg-menu-item {
+.bg-menu-row .bg-menu-item {
     border-bottom: none !important;
     flex-grow: 1 !important;
 }
@@ -406,7 +387,6 @@
     background: transparent !important;
 }
 
-/* Возвращаем стандартный вид кнопкам вне Волны */
 .glass-disabled .iJVAJMgccD4vj4E4o068, 
 .glass-disabled .nHWc2sto1C6Gm0Dpw_l0,
 .glass-disabled [role="tab"] {
@@ -416,7 +396,6 @@
     visibility: visible !important;
 }
 
-/* Полная прозрачность только внутри Волны */
 .glass-disabled [class*="MainPage_vibe"] .iJVAJMgccD4vj4E4o068, 
 .glass-disabled [class*="MainPage_vibe"] .nHWc2sto1C6Gm0Dpw_l0,
 .glass-disabled [class*="MainPage_vibe"] [class*="PlayButton_root"], 
@@ -446,4 +425,67 @@
 
 [class*="Vibe_content"] { 
     z-index: 2 !important; 
+}
+
+/* Панель предпросмотра */
+#bg-preview-panel {
+    position: fixed !important;
+    z-index: 2147483646;
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
+    width: 160px;
+    display: flex !important;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    font-family: 'Segoe UI', sans-serif;
+    color: #aaa;
+    font-size: 11px;
+    box-sizing: border-box;
+}
+#bg-preview-panel.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+.preview-layer-container {
+    position: relative;
+    width: 120px;
+    height: 68px;
+    margin: 0 auto;
+}
+.preview-layer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 6px;
+    background: #000;
+}
+.preview-layer.active {
+    opacity: 1;
+}
+.preview-layer img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.preview-label {
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: bold;
+    font-size: 10px;
+    text-align: center;
+    margin-bottom: 4px;
 }

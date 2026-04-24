@@ -1,28 +1,27 @@
 {
-  "name": "Custom Background",
-  "image": "logo.png",
-  "banner": "banner.png",
-  "libraryLogo": "logo.png",
-  "author": "dieugh",
-  "description": "Скрипт, который позволяет менять глобальный фон приложения и фон блока «Моя волна» на любое изображение или видео.",
-  "version": "1.0.6",
-  "css": "style.css",
-  "script": "script.js",
-  "type": "script",
-  "tags": [
-    "script",
-    "background",
-    "custom"
-  ],
-  "dependencies": [],
-  "conflictsWith": [],
-  "allowedUrls": [],
-  "supportedVersions": [
-    "5.90.0"
-  ],
-  "fromPext": true,
-  "installSource": "store",
-  "id": "09ad7be0-ca29-48a4-b0a3-14e7990d05c9",
-  "packageHash": "f4661e95c472dfe785760555e4a85eb57b577b0d473aec786f6d86cb87f26e39",
-  "storeAddonId": "09ad7be0-ca29-48a4-b0a3-14e7990d05c9"
+    "name": "Custom Background",
+    "image": "logo.png",
+    "banner": "banner.png",
+    "libraryLogo": "logo.png",
+    "author": "dieugh",
+    "description": "Скрипт, который позволяет менять глобальный фон приложения и фон блока «Моя волна» на любое изображение или видео.",
+    "version": "1.0.7",
+    "css": "style.css",
+    "script": "script.js",
+    "type": "script",
+    "tags": [
+        "script",
+        "background",
+        "custom"
+    ],
+    "dependencies": [],
+    "conflictsWith": [],
+    "allowedUrls": [],
+    "supportedVersions": [
+        "5.90.0"
+    ],
+    "id": "09ad7be0-ca29-48a4-b0a3-14e7990d05c9",
+    "fromPext": true,
+    "installSource": "local",
+    "packageHash": "0ca0192b299f1a5d68b0f676061bd8f602c5e78d0d9dd9c276ba49a70f720600"
 }
