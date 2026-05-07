@@ -3,6 +3,8 @@
     const ADAPTIVE_VIBE_KEY = 'adaptive_vibe_enabled';
     let lastCoverUrl = null;
     let addonSettings = {};
+    let newWaveEnabled = false;
+    let isFrozen = false;
 
     let globalFileCache = null;
     let vibeFileCache = null;
@@ -114,32 +116,52 @@
 
         if (globalContainer) {
             stopPixelAnimation('global');
-            if (currentGlobal.isGif) {
-                // GIF — без пикселизации
-            } else if (globalPixel > 0) {
-                if (currentGlobal.isVideo) {
-                    startCanvasAnimation('global', globalContainer, 'global-pixel-canvas', globalPixel);
-                } else {
-                    startCanvasAnimation('global', globalContainer, 'global-pixel-canvas', globalPixel);
-                }
+            if (!currentGlobal.isGif && globalPixel > 0) {
+                startCanvasAnimation('global', globalContainer, 'global-pixel-canvas', globalPixel);
             }
         }
 
         if (vibeContainer) {
             stopPixelAnimation('vibe');
-            if (currentVibe.isGif) {
-                // GIF — без пикселизации
-            } else if (vibePixel > 0) {
-                if (currentVibe.isVideo) {
-                    startCanvasAnimation('vibe', vibeContainer, 'vibe-pixel-canvas', vibePixel);
-                } else {
-                    startCanvasAnimation('vibe', vibeContainer, 'vibe-pixel-canvas', vibePixel);
-                }
+            if (!currentVibe.isGif && vibePixel > 0) {
+                startCanvasAnimation('vibe', vibeContainer, 'vibe-pixel-canvas', vibePixel);
             }
         }
     }
 
-    // ========== ПАНЕЛЬ ПРЕДПРОСМОТРА (исправлено для видео) ==========
+    // ========== УНИВЕРСАЛЬНЫЙ УСТАНОВЩИК МЕДИА ==========
+    function _setMedia(container, url, isVideo) {
+        container.innerHTML = '';
+        if (url) {
+            if (isVideo) {
+                const video = document.createElement('video');
+                video.src = url;
+                video.autoplay = true;
+                video.loop = true;
+                video.muted = true;
+                video.playsInline = true;
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                video.style.borderRadius = '6px';
+                container.appendChild(video);
+                video.play().catch(() => {});
+            } else {
+                const img = document.createElement('img');
+                img.src = url;
+                img.style.width = '100%';
+                img.style.height = '100%';
+                img.style.objectFit = 'cover';
+                img.style.borderRadius = '6px';
+                img.onerror = () => { container.innerHTML = ''; };
+                container.appendChild(img);
+            }
+        } else {
+            container.innerHTML = '<div style="font-size:11px;color:#888;display:flex;align-items:center;justify-content:center;height:100%;">не установлен</div>';
+        }
+    }
+
+    // ========== ПАНЕЛЬ ПРЕДПРОСМОТРА ==========
     function createPreviewPanel() {
         if (previewPanel) return previewPanel;
         previewPanel = document.createElement('div');
@@ -173,38 +195,7 @@
         const inactive = layers.find(l => !l.classList.contains('active'));
         if (!active || !inactive) return;
 
-        inactive.innerHTML = '';
-        const url = mediaInfo?.url;
-        const isVideo = mediaInfo?.isVideo;
-
-        if (url) {
-            if (isVideo) {
-                const video = document.createElement('video');
-                video.src = url;
-                video.autoplay = true;
-                video.loop = true;
-                video.muted = true;
-                video.playsInline = true;
-                video.style.width = '100%';
-                video.style.height = '100%';
-                video.style.objectFit = 'cover';
-                video.style.borderRadius = '6px';
-                inactive.appendChild(video);
-                video.play().catch(() => {});
-            } else {
-                const img = document.createElement('img');
-                img.src = url;
-                img.style.width = '100%';
-                img.style.height = '100%';
-                img.style.objectFit = 'cover';
-                img.style.borderRadius = '6px';
-                img.onerror = () => { inactive.innerHTML = ''; };
-                inactive.appendChild(img);
-            }
-        } else {
-            inactive.innerHTML = '<div style="font-size:11px;color:#888;display:flex;align-items:center;justify-content:center;height:100%;">не установлен</div>';
-        }
-
+        _setMedia(inactive, mediaInfo?.url, mediaInfo?.isVideo);
         active.classList.remove('active');
         inactive.classList.add('active');
 
@@ -266,10 +257,7 @@
         const tx = db.transaction('media', 'readwrite');
         const store = tx.objectStore('media');
         store.put(file, 'current_bg');
-        await new Promise((resolve, reject) => {
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-        });
+        await new Promise((resolve) => { tx.oncomplete = resolve; });
         if (dbName === 'GlobalBackgroundDB') {
             globalFileCache = null;
             await applyGlobalStyle(true);
@@ -282,32 +270,26 @@
     const loadFile = async (dbName) => {
         try {
             const db = await openDB(dbName);
-            return new Promise((resolve, reject) => {
+            return new Promise((resolve) => {
                 const tx = db.transaction('media', 'readonly');
                 const store = tx.objectStore('media');
                 const req = store.get('current_bg');
                 req.onsuccess = () => resolve(req.result || null);
-                req.onerror = () => reject(req.error);
+                req.onerror = () => resolve(null);
             });
-        } catch (e) { 
-            console.error(`[CustomBackground] Failed to load from ${dbName}:`, e);
-            return null; 
-        }
+        } catch (e) { return null; }
     };
 
     const deleteFile = async (dbName) => {
-        return new Promise(async (resolve, reject) => {
+        return new Promise(async (resolve) => {
             try {
                 const db = await openDB(dbName);
                 const tx = db.transaction('media', 'readwrite');
                 const store = tx.objectStore('media');
                 store.delete('current_bg');
                 tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            } catch (e) { 
-                console.error(`[CustomBackground] Failed to delete from ${dbName}:`, e);
-                reject(e); 
-            }
+                tx.onerror = () => resolve();
+            } catch (e) { resolve(); }
         });
     };
 
@@ -346,12 +328,15 @@
         document.documentElement.style.setProperty('--vignette-opacity', (vig / 100).toFixed(2));
         document.documentElement.style.setProperty('--vibe-vignette-opacity', (vVig / 100).toFixed(2));
 
-        const glass = getSetting('glass_enabled', true);
-        document.documentElement.classList.toggle('glass-disabled', !glass);
+        const newVal = getSetting('newWave', false);
+        if (newVal !== newWaveEnabled) {
+            newWaveEnabled = newVal;
+            cleanupCoverTracking();
+            initCoverTracking();
+        }
 
         getGlobalContainer();
         getVibeContainer();
-
         applyAllPixelEffects();
     }
 
@@ -374,34 +359,231 @@
     }
 
     // ========== COVER HELPERS ==========
-    const preloadImage = (url) => new Promise((resolve) => {
-        const img = new Image(); img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(true); img.onerror = () => resolve(false);
-        img.src = url;
-    });
-    function getHighResCoverUrl(coverUri) {
-        if (!coverUri) return null;
-        let uri = coverUri; if (!uri.startsWith('http')) uri = 'https://' + uri;
-        return uri.replace(/\/\d+x\d+(?=[/?&]|$)/, '/1000x1000');
+    function getHighResCoverUrl(url) {
+        if (!url) return null;
+        return url.replace(/\/\d+x\d+(?=[/?&]|$)/, '/1000x1000');
     }
-    async function updateAdaptiveCover(coverUri) {
-        if (!coverUri) {
-            lastCoverUrl = null;
-            if (isAdaptiveGlobalEnabled()) await applyGlobalStyle(true);
-            if (isAdaptiveVibeEnabled()) await initVibeMedia(true);
-            updatePreviewPanel();
-            return;
+
+    function getBestSrcFromSrcSet(img) {
+        const srcset = img.getAttribute('srcset');
+        if (!srcset) return img.src;
+        const sources = srcset.split(',').map(s => s.trim().split(/\s+/));
+        for (const [url, desc] of sources) {
+            if (desc === '2x' || desc === '800w') return url;
         }
-        const url = getHighResCoverUrl(coverUri);
-        if (!url || url === lastCoverUrl) return;
-        const ok = await preloadImage(url); if (!ok) return;
-        lastCoverUrl = url;
-        if (isAdaptiveGlobalEnabled()) await applyGlobalStyle(true);
-        if (isAdaptiveVibeEnabled()) await initVibeMedia(true);
+        return sources[sources.length - 1][0];
+    }
+
+    function handleCoverUrlChange(newUrl) {
+        if (!newUrl) return;
+        const highRes = getHighResCoverUrl(newUrl);
+        if (highRes === lastCoverUrl) return;
+        lastCoverUrl = highRes;
+        if (isAdaptiveGlobalEnabled()) applyGlobalStyle(true);
+        if (isAdaptiveVibeEnabled()) initVibeMedia(true);
         updatePreviewPanel();
     }
 
-    // ========== LAYER MANAGEMENT ==========
+    function isArtistImage(img) {
+        const cls = img.className || '';
+        return /ArtistCover|artist|avatar/i.test(cls);
+    }
+
+    function getBestCoverFromDOM() {
+        const albumCoverImg = document.querySelector('[class*="AlbumCover_cover__bif8b"]');
+        if (albumCoverImg) {
+            const url = getBestSrcFromSrcSet(albumCoverImg);
+            if (url) return url;
+        }
+
+        const playerBar = document.querySelector('[data-test-id="PLAYER_BAR"]') ||
+                          document.querySelector('[class*="PlayerBarDesktop"]') ||
+                          document.querySelector('[class*="player_bar"]');
+        if (playerBar) {
+            const playerImg = playerBar.querySelector('img[src*="avatars.yandex.net"]');
+            if (playerImg) {
+                const url = getBestSrcFromSrcSet(playerImg);
+                if (url) return url;
+            }
+        }
+
+        const allImgs = document.querySelectorAll('img[src*="avatars.yandex.net"]');
+        let bestImg = null;
+        let bestArea = 0;
+        let isBestAlbumCover = false;
+
+        for (const img of allImgs) {
+            if (isArtistImage(img)) continue;
+            const w = img.naturalWidth || img.clientWidth || 0;
+            const h = img.naturalHeight || img.clientHeight || 0;
+            if (w < 200 || h < 200) continue;
+            const area = w * h;
+            const hasAlbumClass = /AlbumCover/i.test(img.className);
+            if (isBestAlbumCover && !hasAlbumClass) continue;
+            if (area > bestArea || (hasAlbumClass && !isBestAlbumCover)) {
+                bestArea = area;
+                bestImg = img;
+                isBestAlbumCover = hasAlbumClass;
+            }
+        }
+
+        if (bestImg) {
+            return getBestSrcFromSrcSet(bestImg);
+        }
+
+        return null;
+    }
+
+    // ========== ОТСЛЕЖИВАНИЕ ОБЛОЖЕК ==========
+    let coverObserver = null;
+    let coverInterval = null;
+    let retryTimer = null;
+    let retryAttempts = 0;
+    const MAX_RETRIES = 5;
+    const RETRY_DELAYS = [200, 400, 800, 1500, 3000];
+
+    function scheduleCoverCheck() {
+        if (retryTimer) clearTimeout(retryTimer);
+        retryAttempts = 0;
+        runRetry();
+    }
+
+    function runRetry() {
+        const url = getBestCoverFromDOM();
+        if (url) {
+            const highRes = getHighResCoverUrl(url);
+            if (highRes !== lastCoverUrl) {
+                handleCoverUrlChange(url);
+                return;
+            }
+        }
+        if (retryAttempts < MAX_RETRIES) {
+            const delay = RETRY_DELAYS[retryAttempts] || 3000;
+            retryTimer = setTimeout(() => {
+                retryAttempts++;
+                runRetry();
+            }, delay);
+        }
+    }
+
+    function startSmartCoverTracking() {
+        stopSmartCoverTracking();
+        if (isFrozen) return;
+        setTimeout(() => scheduleCoverCheck(), 1500);
+
+        coverObserver = new MutationObserver((mutations) => {
+            if (isFrozen) return;
+            const shouldCheck = mutations.some(m =>
+                m.type === 'childList' ||
+                (m.type === 'attributes' && (m.attributeName === 'style' || m.attributeName === 'class' || m.attributeName === 'src'))
+            );
+            if (shouldCheck) scheduleCoverCheck();
+        });
+        coverObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class', 'src']
+        });
+
+        coverInterval = setInterval(() => {
+            if (!isFrozen) scheduleCoverCheck();
+        }, 5000);
+    }
+
+    function stopSmartCoverTracking() {
+        if (coverObserver) { coverObserver.disconnect(); coverObserver = null; }
+        clearInterval(coverInterval);
+        coverInterval = null;
+        clearTimeout(retryTimer);
+    }
+
+    let playerTrackInterval = null;
+    function initPlayerDomTracking() {
+        if (isFrozen) return;
+        if (playerTrackInterval) clearInterval(playerTrackInterval);
+        let prevUrl = null;
+        const check = () => {
+            if (isFrozen) return;
+            if (!isAdaptiveGlobalEnabled() && !isAdaptiveVibeEnabled()) return;
+            const playerBar = document.querySelector('[data-test-id="PLAYER_BAR"]') ||
+                              document.querySelector('[class*="PlayerBarDesktop"]') ||
+                              document.querySelector('[class*="player_bar"]');
+            if (!playerBar) return;
+            const img = playerBar.querySelector('img[src*="avatars.yandex.net"]');
+            if (!img || !img.src) return;
+            const highRes = img.src.replace(/&amp;/g, '&').replace(/\/\d+x\d+(?=[/?&]|$)/, '/1000x1000');
+            if (highRes !== prevUrl) {
+                prevUrl = highRes;
+                handleCoverUrlChange(highRes);
+            }
+        };
+        setTimeout(check, 2000);
+        playerTrackInterval = setInterval(check, 1000);
+    }
+
+    function stopPlayerDomTracking() {
+        if (playerTrackInterval) {
+            clearInterval(playerTrackInterval);
+            playerTrackInterval = null;
+        }
+    }
+
+    function initPulseSyncTracking() {
+        if (typeof Theme === 'undefined') return false;
+        try {
+            const theme = new Theme('custom-background');
+            const onTrack = (eventData) => {
+                const track = eventData?.state?.track;
+                if (track?.coverUri) handleCoverUrlChange(track.coverUri);
+            };
+            theme.player.on('trackChange', onTrack);
+            theme.player.on('pageChange', onTrack);
+            try {
+                const cur = theme.player.getCurrentTrack?.();
+                if (cur?.coverUri) handleCoverUrlChange(cur.coverUri);
+            } catch (e) {}
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function initCoverTracking() {
+        if (!initPulseSyncTracking()) {
+            if (newWaveEnabled) {
+                startSmartCoverTracking();
+            } else {
+                initPlayerDomTracking();
+            }
+        }
+    }
+
+    function cleanupCoverTracking() {
+        stopSmartCoverTracking();
+        stopPlayerDomTracking();
+    }
+
+    // ========== ЗАМОРОЗКА ПРИ СВОРАЧИВАНИИ ==========
+    function freeze() {
+        if (isFrozen) return;
+        isFrozen = true;
+        console.log('[CustomBackground] Заморозка отслеживания');
+        cleanupCoverTracking();
+    }
+
+    function unfreeze() {
+        if (!isFrozen) return;
+        isFrozen = false;
+        console.log('[CustomBackground] Разморозка, запуск отслеживания с задержкой');
+        setTimeout(() => {
+            if (!isFrozen) {
+                initCoverTracking();
+            }
+        }, 300);
+    }
+
+    // ========== СЛОИ ==========
     function ensureLayers(container) {
         let layers = container.querySelectorAll('.cbg-layer');
         if (layers.length < 2) {
@@ -409,10 +591,10 @@
             const l1 = document.createElement('div'); l1.className = 'cbg-layer active';
             const l2 = document.createElement('div'); l2.className = 'cbg-layer';
             container.appendChild(l1); container.appendChild(l2);
-            layers = [l1, l2];
         }
         if (!container.querySelector('.cbg-layer.active')) {
-            layers[0].classList.add('active'); layers[1].classList.remove('active');
+            const [first, second] = container.querySelectorAll('.cbg-layer');
+            first.classList.add('active'); second.classList.remove('active');
         }
         if (!container.querySelector('.cbg-vignette')) {
             const vignette = document.createElement('div');
@@ -426,7 +608,8 @@
         let container = document.getElementById(id);
         if (!container && prependTo) {
             container = document.createElement('div'); container.id = id;
-            prependTo.prepend(container); ensureLayers(container);
+            prependTo.prepend(container);
+            ensureLayers(container);
         } else if (container) {
             ensureLayers(container);
         }
@@ -436,28 +619,38 @@
     function getGlobalContainer() { return createContainer('global-background-container', document.body); }
 
     function getVibeContainer() {
-        const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
         const oldContainer = document.getElementById('vibe-background-container');
-        
-        if (!vibe) { 
-            if (oldContainer) oldContainer.remove(); 
-            return null; 
+
+        if (newWaveEnabled) {
+            const vibe = document.querySelector('[class*="VibePage_root"]') ||
+                         document.querySelector('[data-test-id="MAIN_PAGE"]');
+            if (!vibe) {
+                if (oldContainer) oldContainer.remove();
+                return null;
+            }
+            vibe.style.position = 'relative';
+            return createContainer('vibe-background-container', vibe);
+        } else {
+            const vibe = document.querySelector('[class*="MainPage_vibe"]') ||
+                         document.querySelector('[data-test-id="VIBE_BLOCK"]');
+            if (!vibe) {
+                if (oldContainer) oldContainer.remove();
+                return null;
+            }
+            vibe.style.setProperty('height', 'calc(100vh - 70px)', 'important');
+            vibe.style.setProperty('min-height', 'calc(100vh - 70px)', 'important');
+            vibe.style.setProperty('padding', '0', 'important');
+            return createContainer('vibe-background-container', vibe);
         }
-        
-        vibe.style.setProperty('height', 'calc(100vh - 70px)', 'important');
-        vibe.style.setProperty('min-height', 'calc(100vh - 70px)', 'important');
-        vibe.style.setProperty('padding', '0', 'important');
-        
-        let container = createContainer('vibe-background-container', vibe);
-        
-        return container;
     }
 
     function cleanupOldBlobUrls(urlSet, newUrl) {
         for (const url of urlSet) { if (url !== newUrl) URL.revokeObjectURL(url); }
-        urlSet.clear(); if (newUrl) urlSet.add(newUrl);
+        urlSet.clear();
+        if (newUrl) urlSet.add(newUrl);
     }
 
+    // ===== ИСПРАВЛЕНО: добавляем класс cbg-media =====
     function crossfade(container, url, isVideo) {
         if (!container || !url) return false;
         ensureLayers(container);
@@ -465,32 +658,19 @@
         const inactive = container.querySelector('.cbg-layer:not(.active)');
         if (!active || !inactive) return false;
 
-        inactive.innerHTML = '';
-        if (isVideo) {
-            const video = document.createElement('video');
-            video.src = url; 
-            video.autoplay = true; 
-            video.loop = true; 
-            video.muted = true; 
-            video.playsInline = true;
-            video.className = 'cbg-media';
-            inactive.appendChild(video);
-            if (!document.hidden) video.play().catch(() => {});
-        } else {
-            const img = document.createElement('img');
-            img.src = url;
-            img.className = 'cbg-media';
-            inactive.appendChild(img);
-        }
+        _setMedia(inactive, url, isVideo);
+
+        // Применяем класс cbg-media, чтобы заработали CSS-фильтры
+        const media = inactive.querySelector('video') || inactive.querySelector('img');
+        if (media) media.className = 'cbg-media';
 
         void inactive.offsetWidth;
-
         active.classList.remove('active');
         inactive.classList.add('active');
 
-        setTimeout(() => { 
+        setTimeout(() => {
             if (!active.classList.contains('active')) {
-                active.innerHTML = ''; 
+                active.innerHTML = '';
             }
         }, 700);
 
@@ -516,11 +696,9 @@
         try {
             const container = getGlobalContainer();
             if (!container) return;
-            
-            let targetUrl = null; 
-            let isVideo = false;
-            let isGif = false;
-            
+
+            let targetUrl = null, isVideo = false, isGif = false;
+
             if (isAdaptiveGlobalEnabled()) {
                 targetUrl = lastCoverUrl;
                 if (targetUrl) isGif = targetUrl.toLowerCase().endsWith('.gif');
@@ -532,45 +710,41 @@
                         globalFileCache = { url: newUrl, type: file.type };
                         cleanupOldBlobUrls(globalBlobUrls, newUrl);
                     }
-                    targetUrl = globalFileCache.url; 
+                    targetUrl = globalFileCache.url;
                     const type = globalFileCache.type;
                     isVideo = type.startsWith('video/');
                     isGif = type === 'image/gif' || targetUrl.toLowerCase().endsWith('.gif');
                 } else {
-                    if (globalFileCache) { 
-                        cleanupOldBlobUrls(globalBlobUrls, null); 
-                        globalFileCache = null; 
+                    if (globalFileCache) {
+                        cleanupOldBlobUrls(globalBlobUrls, null);
+                        globalFileCache = null;
                     }
                 }
             }
-            
-            if (targetUrl) { 
-                clearTimeout(resetTimers.global); 
-                resetTimers.global = null; 
+
+            if (targetUrl) {
+                clearTimeout(resetTimers.global);
+                resetTimers.global = null;
             }
-            
-            const isFirstLoad = !currentGlobal.url && targetUrl;
-            const shouldUpdate = force || isFirstLoad || (currentGlobal.url !== targetUrl);
-            
+
+            const shouldUpdate = force || (currentGlobal.url !== targetUrl);
             if (!shouldUpdate) return;
-            
+
             currentGlobal.url = targetUrl;
             currentGlobal.isVideo = isVideo;
             currentGlobal.isGif = isGif;
-            
-            if (!targetUrl) { 
-                fadeOutClear(container, 'global'); 
+
+            if (!targetUrl) {
+                fadeOutClear(container, 'global');
                 updatePreviewPanel();
-                applyAllPixelEffects(); 
-                return; 
+                applyAllPixelEffects();
+                return;
             }
-            
+
             crossfade(container, targetUrl, isVideo);
             updatePreviewPanel();
             applyAllPixelEffects();
-        } finally { 
-            globalUpdatePending = false; 
-        }
+        } finally { globalUpdatePending = false; }
     }
 
     async function initVibeMedia(force = false) {
@@ -579,11 +753,9 @@
         try {
             const container = getVibeContainer();
             if (!container) return;
-            
-            let targetUrl = null; 
-            let isVideo = false;
-            let isGif = false;
-            
+
+            let targetUrl = null, isVideo = false, isGif = false;
+
             if (isAdaptiveVibeEnabled()) {
                 targetUrl = lastCoverUrl;
                 if (targetUrl) isGif = targetUrl.toLowerCase().endsWith('.gif');
@@ -595,60 +767,62 @@
                         vibeFileCache = { url: newUrl, type: file.type };
                         cleanupOldBlobUrls(vibeBlobUrls, newUrl);
                     }
-                    targetUrl = vibeFileCache.url; 
+                    targetUrl = vibeFileCache.url;
                     const type = vibeFileCache.type;
                     isVideo = type.startsWith('video/');
                     isGif = type === 'image/gif' || targetUrl.toLowerCase().endsWith('.gif');
                 } else {
-                    if (vibeFileCache) { 
-                        cleanupOldBlobUrls(vibeBlobUrls, null); 
-                        vibeFileCache = null; 
+                    if (vibeFileCache) {
+                        cleanupOldBlobUrls(vibeBlobUrls, null);
+                        vibeFileCache = null;
                     }
                 }
             }
-            
-            if (targetUrl) { 
-                clearTimeout(resetTimers.vibe); 
-                resetTimers.vibe = null; 
+
+            if (targetUrl) {
+                clearTimeout(resetTimers.vibe);
+                resetTimers.vibe = null;
             }
-            
-            const isFirstLoad = !currentVibe.url && targetUrl;
-            const shouldUpdate = force || isFirstLoad || (currentVibe.url !== targetUrl);
-            
+
+            const shouldUpdate = force || (currentVibe.url !== targetUrl);
             if (!shouldUpdate) return;
-            
+
             currentVibe.url = targetUrl;
             currentVibe.isVideo = isVideo;
             currentVibe.isGif = isGif;
-            
-            if (!targetUrl) { 
-                fadeOutClear(container, 'vibe'); 
+
+            if (!targetUrl) {
+                fadeOutClear(container, 'vibe');
                 updatePreviewPanel();
-                applyAllPixelEffects(); 
-                return; 
+                applyAllPixelEffects();
+                return;
             }
-            
+
             crossfade(container, targetUrl, isVideo);
             updatePreviewPanel();
             applyAllPixelEffects();
-        } finally { 
-            vibeUpdatePending = false; 
-        }
+        } finally { vibeUpdatePending = false; }
     }
 
-    // ========== VIDEO PAUSE/PLAY ==========
-    function updateVideoPlayback() {
-        const hidden = document.hidden;
-        document.querySelectorAll('#global-background-container video, #vibe-background-container video').forEach(v => {
-            if (hidden) v.pause(); else v.play().catch(() => {});
-        });
-    }
-    document.addEventListener('visibilitychange', updateVideoPlayback);
+    // ========== МЕНЮ ==========
+    let currentMenuClickHandler = null;
+    let currentMousedownHandler = null;
 
-    // ========== MENU (без изменений) ==========
     function injectMenu() {
         const anchorBtn = document.querySelector('.TitleBar_button__9MptL');
         if (!anchorBtn || document.getElementById('bg-menu-button')) return;
+
+        const oldDropdown = document.getElementById('bg-menu-dropdown');
+        if (oldDropdown) oldDropdown.remove();
+
+        if (currentMousedownHandler) {
+            document.removeEventListener('mousedown', currentMousedownHandler, true);
+            currentMousedownHandler = null;
+        }
+        if (currentMenuClickHandler) {
+            anchorBtn.removeEventListener('click', currentMenuClickHandler);
+            currentMenuClickHandler = null;
+        }
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -680,16 +854,17 @@
 
         let pendingRaf = null;
 
-        btn.addEventListener('click', (e) => {
+        currentMenuClickHandler = (e) => {
             e.stopPropagation();
             const dd = document.getElementById('bg-menu-dropdown');
+            if (!dd) return;
             const isActive = dd.classList.contains('active');
-            
+
             if (pendingRaf) {
                 cancelAnimationFrame(pendingRaf);
                 pendingRaf = null;
             }
-            
+
             if (isActive) {
                 dd.classList.remove('active');
                 hidePreviewPanel();
@@ -701,7 +876,21 @@
                     showPreviewPanel(dd);
                 });
             }
-        });
+        };
+        btn.addEventListener('click', currentMenuClickHandler);
+
+        currentMousedownHandler = (e) => {
+            const dd = document.getElementById('bg-menu-dropdown');
+            if (dd && dd.classList.contains('active') && !dd.contains(e.target) && !btn.contains(e.target)) {
+                dd.classList.remove('active');
+                hidePreviewPanel();
+                if (pendingRaf) {
+                    cancelAnimationFrame(pendingRaf);
+                    pendingRaf = null;
+                }
+            }
+        };
+        document.addEventListener('mousedown', currentMousedownHandler, true);
 
         function positionDropdown() {
             const rect = btn.getBoundingClientRect();
@@ -713,18 +902,6 @@
             dd.style.left = `${Math.max(8, left)}px`;
         }
 
-        document.addEventListener('mousedown', (e) => {
-            const dd = document.getElementById('bg-menu-dropdown');
-            if (dd && dd.classList.contains('active') && !dd.contains(e.target) && e.target !== btn) {
-                dd.classList.remove('active');
-                hidePreviewPanel();
-                if (pendingRaf) {
-                    cancelAnimationFrame(pendingRaf);
-                    pendingRaf = null;
-                }
-            }
-        }, true);
-
         window.addEventListener('resize', () => {
             const dd = document.getElementById('bg-menu-dropdown');
             if (dd && dd.classList.contains('active') && previewPanel?.classList.contains('active')) {
@@ -735,7 +912,7 @@
 
         const openPicker = (db) => {
             const input = document.createElement('input');
-            input.type = 'file'; 
+            input.type = 'file';
             input.accept = 'video/mp4,video/webm,image/*';
             input.onchange = e => {
                 if (e.target.files[0]) {
@@ -753,36 +930,36 @@
 
         document.getElementById('btn-reset-global').onclick = async () => {
             await deleteFile('GlobalBackgroundDB');
-            globalFileCache = null; 
+            globalFileCache = null;
             currentGlobal.url = null;
             currentGlobal.isVideo = false;
             currentGlobal.isGif = false;
-            await applyGlobalStyle(true); 
-            updatePreviewPanel(); 
+            await applyGlobalStyle(true);
+            updatePreviewPanel();
             applyAllPixelEffects();
         };
-        
+
         document.getElementById('btn-reset-vibe').onclick = async () => {
             await deleteFile('VibeVideoDB');
-            vibeFileCache = null; 
+            vibeFileCache = null;
             currentVibe.url = null;
             currentVibe.isVideo = false;
             currentVibe.isGif = false;
-            await initVibeMedia(true); 
-            updatePreviewPanel(); 
+            await initVibeMedia(true);
+            updatePreviewPanel();
             applyAllPixelEffects();
         };
 
         document.getElementById('btn-toggle-adaptive-global').onclick = async () => {
             const next = !isAdaptiveGlobalEnabled();
-            if (next) { 
-                await deleteFile('GlobalBackgroundDB'); 
-                globalFileCache = null; 
+            if (next) {
+                await deleteFile('GlobalBackgroundDB');
+                globalFileCache = null;
             }
             setAdaptiveGlobalEnabled(next);
             await applyGlobalStyle(true);
-            if (!next) { 
-                currentGlobal.url = null; 
+            if (!next) {
+                currentGlobal.url = null;
                 currentGlobal.isVideo = false;
                 currentGlobal.isGif = false;
             }
@@ -792,14 +969,14 @@
 
         document.getElementById('btn-toggle-adaptive-vibe').onclick = async () => {
             const next = !isAdaptiveVibeEnabled();
-            if (next) { 
-                await deleteFile('VibeVideoDB'); 
-                vibeFileCache = null; 
+            if (next) {
+                await deleteFile('VibeVideoDB');
+                vibeFileCache = null;
             }
             setAdaptiveVibeEnabled(next);
             await initVibeMedia(true);
-            if (!next) { 
-                currentVibe.url = null; 
+            if (!next) {
+                currentVibe.url = null;
                 currentVibe.isVideo = false;
                 currentVibe.isGif = false;
             }
@@ -813,107 +990,131 @@
     // ========== OBSERVERS ==========
     let menuObserver;
     let vibeObserver;
-    
+
     function initObservers() {
+        if (menuObserver) {
+            menuObserver.disconnect();
+            menuObserver = null;
+        }
         menuObserver = new MutationObserver(() => {
             if (!document.getElementById('bg-menu-button') && document.querySelector('.TitleBar_button__9MptL')) {
                 injectMenu();
             }
         });
         menuObserver.observe(document.body, { childList: true, subtree: true });
-        
+
+        if (vibeObserver) {
+            vibeObserver.disconnect();
+            vibeObserver = null;
+        }
         vibeObserver = new MutationObserver(() => {
-            const vibe = document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]');
+            const vibe = newWaveEnabled
+                ? (document.querySelector('[class*="VibePage_root"]') || document.querySelector('[data-test-id="MAIN_PAGE"]'))
+                : (document.querySelector('[class*="MainPage_vibe"]') || document.querySelector('[data-test-id="VIBE_BLOCK"]'));
             if (vibe && !document.getElementById('vibe-background-container')) {
                 initVibeMedia(true);
             }
         });
         vibeObserver.observe(document.body, { childList: true, subtree: true });
     }
-    
+
     function disconnectObservers() {
         if (menuObserver) menuObserver.disconnect();
         if (vibeObserver) vibeObserver.disconnect();
     }
 
-    // ========== PULSE SYNC ==========
     function initPulseSyncSettings() {
-        if (!window.pulsesyncApi) { 
-            setTimeout(initPulseSyncSettings, 500); 
-            return; 
+        if (!window.pulsesyncApi) {
+            setTimeout(initPulseSyncSettings, 500);
+            return;
         }
         const addonName = 'Custom Background';
         let api = null;
-        try { 
-            api = window.pulsesyncApi.getSettings?.(addonName); 
-        } catch (e) { 
-            console.warn('[CustomBackground] getSettings error:', e); 
+        try {
+            api = window.pulsesyncApi.getSettings?.(addonName);
+        } catch (e) {}
+        if (!api || !api.onChange) {
+            setTimeout(initPulseSyncSettings, 1000);
+            return;
         }
-        if (!api || !api.onChange) { 
-            setTimeout(initPulseSyncSettings, 1000); 
-            return; 
-        }
-        const handle = (s) => { 
-            addonSettings = s || {}; 
-            applySettings(); 
+        const handle = (s) => {
+            addonSettings = s || {};
+            applySettings();
         };
-        handle(api.getCurrent?.() || {}); 
+        handle(api.getCurrent?.() || {});
         api.onChange((s) => handle(s));
         console.log('[CustomBackground] PulseSync settings API подключен');
     }
 
-    function initPulseSyncTracking() {
-        if (typeof Theme === 'undefined') return false;
-        try {
-            const theme = new Theme('custom-background');
-            const handleEvent = async (eventData) => {
-                const track = eventData?.state?.track;
-                await updateAdaptiveCover(track?.coverUri);
-            };
-            theme.player.on('trackChange', handleEvent);
-            theme.player.on('pageChange', handleEvent);
-            try { 
-                const cur = theme.player.getCurrentTrack?.(); 
-                if (cur?.coverUri) updateAdaptiveCover(cur.coverUri); 
-            } catch (e) {}
-            return true;
-        } catch (e) { 
-            console.error('[CustomBackground] PulseSync API error:', e); 
-            return false; 
+    // ========== ФИКС ПЕРЕКРЫТИЯ (новая волна) ==========
+    let layoutFixObserver = null;
+
+    function fixVibeLayoutOverlay() {
+        const overlay = document.querySelector('.DefaultLayout_rootNewWave');
+        if (overlay) {
+            overlay.style.setProperty('background', 'transparent', 'important');
         }
     }
 
-    function initPlayerDomTracking() {
-        let prevUrl = null;
-        setInterval(() => {
-            if (!isAdaptiveGlobalEnabled() && !isAdaptiveVibeEnabled()) return;
-            const playerBar = document.querySelector('[class*="PlayerBarDesktop"]') 
-                || document.querySelector('[data-test-id="PLAYER_BAR"]')
-                || document.querySelector('.player-controls__track')
-                || document.querySelector('[class*="player_bar"]');
-            if (!playerBar) return;
-            const img = playerBar.querySelector('img[src*="avatars.yandex.net"]');
-            if (!img || !img.src) return;
-            const highRes = img.src.replace(/&amp;/g, '&').replace(/\/\d+x\d+(?=[/?&]|$)/, '/1000x1000');
-            if (highRes !== prevUrl) {
-                prevUrl = highRes; 
-                lastCoverUrl = highRes;
-                if (isAdaptiveGlobalEnabled()) applyGlobalStyle(true);
-                if (isAdaptiveVibeEnabled()) initVibeMedia(true);
-                updatePreviewPanel();
+    function startLayoutFixObserver() {
+        fixVibeLayoutOverlay();
+        layoutFixObserver = new MutationObserver(() => {
+            if (document.querySelector('.DefaultLayout_rootNewWave')) {
+                fixVibeLayoutOverlay();
             }
-        }, 1000);
+        });
+        layoutFixObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class']
+        });
     }
+
+    function stopLayoutFixObserver() {
+        if (layoutFixObserver) {
+            layoutFixObserver.disconnect();
+            layoutFixObserver = null;
+        }
+    }
+
+    window.__bgDebug = {
+        getLastCoverUrl: () => lastCoverUrl,
+        getBestCover: () => getBestCoverFromDOM(),
+        forceCheck: () => scheduleCoverCheck(),
+    };
 
     // ========== INIT ==========
     async function init() {
-        applySettings(); 
+        lastCoverUrl = null;
+
+        applySettings();
         initObservers();
-        
+        if (newWaveEnabled) {
+            startLayoutFixObserver();
+        }
         await applyGlobalStyle(true);
         await initVibeMedia(true);
-        
-        if (!initPulseSyncTracking()) initPlayerDomTracking();
+
+        // Единый обработчик visibilitychange (видео + заморозка)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                document.querySelectorAll('#global-background-container video, #vibe-background-container video').forEach(v => v.pause());
+                freeze();
+            } else {
+                document.querySelectorAll('#global-background-container video, #vibe-background-container video').forEach(v => {
+                    v.play().catch(() => {});
+                });
+                unfreeze();
+            }
+        });
+
+        if (!document.hidden) {
+            setTimeout(() => {
+                if (!isFrozen) initCoverTracking();
+            }, 2000);
+        }
+
         initPulseSyncSettings();
     }
 
@@ -928,6 +1129,8 @@
 
     window.addEventListener('beforeunload', () => {
         disconnectObservers();
+        stopLayoutFixObserver();
+        cleanupCoverTracking();
         stopPixelAnimation('global');
         stopPixelAnimation('vibe');
         cleanupOldBlobUrls(globalBlobUrls, null);

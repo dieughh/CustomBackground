@@ -1,15 +1,15 @@
 {
     "sections": [
         {
-            "title": "Жидкое стекло",
+            "title": "Новая страница «Моя волна»",
             "items": [
                 {
-                    "id": "glass_enabled",
-                    "name": "Жидкое стекло",
-                    "description": "Включает эффект матового стекла на кнопках в блоке «Моя волна»",
+                    "id": "newWave",
+                    "name": "Новая волна",
+                    "description": "Включите, если у вас уже развёрнут новый дизайн страницы «Моя волна»",
                     "type": "button",
-                    "bool": true,
-                    "defaultParameter": true
+                    "bool": false,
+                    "defaultParameter": false
                 }
             ]
         },

@@ -50,6 +50,14 @@
     opacity: var(--global-opacity, 1);
 }
 
+/* Гарантируем прозрачность промежуточных слоёв, чтобы фон был виден */
+[class*="CommonLayout_root"],
+[class*="DefaultLayout_root"],
+[class*="App_root"] {
+    background: transparent !important;
+    background-image: none !important;
+}
+
 #global-background-container .cbg-layer {
     position: absolute;
     inset: 0;
@@ -282,149 +290,11 @@
 }
 
 /* ============================================
-   ЖИДКОЕ СТЕКЛО (Glass)
-   ============================================ */
-[class*="PlayButton_root"] {
-    background: rgba(0, 0, 0, 0.5) !important; 
-    backdrop-filter: blur(20px) saturate(180%) !important; 
-    box-shadow: 
-        inset 0 1px 1px rgba(255, 255, 255, 0.3),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.4),
-        0 4px 15px rgba(0, 0, 0, 0.6) !important; 
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    color: #fff !important;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
-    transition: background 0.2s ease !important;
-}
-
-[class*="PlayButton_root"]:hover {
-    background: rgba(0, 0, 0, 0.7) !important;
-    transform: none !important; 
-}
-
-[class*="VibeContext_pinButton"] {
-    background: rgba(0, 0, 0, 0.5) !important;
-    backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
-    transition: background 0.2s ease !important;
-}
-
-[class*="VibeContext_pinButton"]:hover {
-    background: rgba(0, 0, 0, 0.7) !important;
-}
-
-[class*="VibeContext_context"] {
-    background: rgba(0, 0, 0, 0.5) !important;
-    backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-left: none !important;
-    color: #fff !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
-}
-
-[class*="VibeContext_context"] span {
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8) !important;
-    font-weight: 600 !important;
-}
-
-[class*="PlayButton_root"]::after, 
-[class*="VibeContext_pinButton"]::after {
-    content: "" !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    height: 40% !important;
-    background: linear-gradient(
-        to bottom, 
-        rgba(255, 255, 255, 0.1) 0%, 
-        rgba(255, 255, 255, 0) 100%
-    ) !important;
-    pointer-events: none !important;
-}
-
-[class*="VibeContext_resetButton"] {
-    color: #fff !important;
-    opacity: 0.8;
-}
-
-[class*="VibeContext_resetButton"]:hover {
-    opacity: 1;
-}
-
-[class*="PlayButton_root"]:hover [class*="PlayButton_icon"] {
-    transform: none !important;
-}
-
-/* --- ОТКЛЮЧЕНИЕ СТЕКЛА --- */
-.glass-disabled [class*="PlayButton_root"],
-.glass-disabled [class*="VibeContext_pinButton"],
-.glass-disabled [class*="VibeContext_context"],
-.glass-disabled [class*="MainPage_vibe"]::before {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background: transparent !important; 
-    box-shadow: none !important;
-    border-color: transparent !important;
-}
-
-.glass-disabled [class*="PlayButton_root"]::after, 
-.glass-disabled [class*="VibeContext_pinButton"]::after {
-    display: none !important;
-}
-
-.glass-disabled .iJVAJMgccD4vj4E4o068,
-.glass-disabled .nHWc2sto1C6Gm0Dpw_l0,
-.glass-disabled [class*="VibeSettings_toggleSettingsButton"] {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background: rgba(255, 255, 255, 0.1) !important;
-    box-shadow: none !important;
-}
-
-.glass-disabled [class*="VibeSettings_toggleSettingsButton"] {
-    background: transparent !important;
-}
-
-.glass-disabled .iJVAJMgccD4vj4E4o068, 
-.glass-disabled .nHWc2sto1C6Gm0Dpw_l0,
-.glass-disabled [role="tab"] {
-    background-color: var(--ym-controls-color-secondary-default-enabled) !important;
-    backdrop-filter: saturate(180%) blur(0.9375rem) !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-.glass-disabled [class*="MainPage_vibe"] .iJVAJMgccD4vj4E4o068, 
-.glass-disabled [class*="MainPage_vibe"] .nHWc2sto1C6Gm0Dpw_l0,
-.glass-disabled [class*="MainPage_vibe"] [class*="PlayButton_root"], 
-.glass-disabled [class*="MainPage_vibe"] [class*="VibeContext_pinButton"],
-.glass-disabled [class*="MainPage_vibe"] [class*="VibeContext_context"],
-.glass-disabled [class*="MainPage_vibe"] [class*="VibeSettings_toggleSettingsButton"],
-.glass-disabled [class*="MainPage_vibe"]::before {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background: transparent !important;
-    background-color: transparent !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    border: none !important;
-}
-
-.glass-disabled [class*="MainPage_vibe"] *::after {
-    display: none !important;
-}
-
-/* ============================================
    РАЗНОЕ
    ============================================ */
 [class*="MainPage_vibe"] { 
     background: transparent !important; 
-}
-
-[class*="Vibe_content"] { 
-    z-index: 2 !important; 
+    position: relative !important;
 }
 
 /* Панель предпросмотра */
