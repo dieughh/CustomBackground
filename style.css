@@ -40,12 +40,12 @@
    НОВЫЕ КОНТЕЙНЕРЫ С CROSSFADE
    ============================================ */
 
+/* Убран background: black – контейнер прозрачен, видно слои Chroma Sync */
 #global-background-container {
     position: fixed !important;
     inset: 0 !important;
     z-index: -1 !important;
     pointer-events: none;
-    background: black;
     overflow: hidden;
     opacity: var(--global-opacity, 1);
 }
@@ -358,4 +358,9 @@
     font-size: 10px;
     text-align: center;
     margin-bottom: 4px;
+}
+
+#global-background-container .cbg-layer,
+#vibe-background-container .cbg-layer {
+    transition: transform 0.08s ease-out, background-position 0.08s ease-out;
 }
