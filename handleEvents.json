@@ -6,10 +6,10 @@
                 {
                     "id": "newWave",
                     "name": "Новая волна",
-                    "description": "Включите, если у вас уже развёрнут новый дизайн страницы «Моя волна»",
+                    "description": "Включите, если у вас новый дизайн страницы «Моя волна»",
                     "type": "button",
-                    "bool": false,
-                    "defaultParameter": false
+                    "bool": true,
+                    "defaultParameter": true
                 }
             ]
         },
